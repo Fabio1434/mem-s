@@ -28,16 +28,21 @@ DECISIONS = os.path.join("data", "processed", "decisions.jsonl")
 LAB_NETWORK = ipaddress.ip_network("10.0.0.0/24")
 
 
-def _mitigation_enabled():
-    """Require an explicit config switch and a separate environment opt-in."""
-    if os.getenv("GNN_SDN_MITIGATION", "0") != "1":
-        return False
+def _mitigation_settings():
+    """Require explicit config and environment opt-ins; bound temporary block lifetime."""
     try:
         with open("config/config.yaml", "r", encoding="utf-8") as handle:
             config = yaml.safe_load(handle) or {}
-        return bool(config.get("mitigation", {}).get("enabled", False))
-    except (OSError, yaml.YAMLError, AttributeError):
-        return False
+        mitigation = config.get("mitigation", {})
+        timeout = int(mitigation.get("block_timeout_seconds", 60))
+        timeout = max(1, min(timeout, 3600))
+        enabled = (
+            os.getenv("GNN_SDN_MITIGATION", "0") == "1"
+            and bool(mitigation.get("enabled", False))
+        )
+        return enabled, timeout
+    except (OSError, yaml.YAMLError, AttributeError, TypeError, ValueError):
+        return False, 60
 
 
 class FlowStatsCollector(app_manager.RyuApp):
@@ -51,10 +56,10 @@ class FlowStatsCollector(app_manager.RyuApp):
         self.mac_to_port = {}
         # Ignore stale decisions from previous runs; consume only newly appended rows.
         self.decision_offset = os.path.getsize(DECISIONS) if os.path.exists(DECISIONS) else 0
-        self.mitigation_enabled = _mitigation_enabled()
+        self.mitigation_enabled, self.block_timeout_seconds = _mitigation_settings()
         self._ensure_output()
         if self.mitigation_enabled:
-            self.logger.warning("Lab mitigation is ENABLED; IPv4 blocks expire after 60 seconds")
+            self.logger.warning(\n                "Lab mitigation is ENABLED; IPv4 blocks expire after %d seconds",\n                self.block_timeout_seconds,\n            )
         else:
             self.logger.info("Observation/alert mode; automatic mitigation is disabled")
         self.monitor_thread = hub.spawn(self._monitor)
@@ -226,10 +231,10 @@ class FlowStatsCollector(app_manager.RyuApp):
                 priority=100,
                 match=match,
                 actions=[],
-                hard_timeout=60,
+                hard_timeout=self.block_timeout_seconds,
             )
         self.logger.warning(
-            "Temporary lab block installed for %s (score=%.3f, timeout=60s)",
+            "Temporary lab block installed for %s (score=%.3f, timeout=%ss)",
             source_ip,
             score,
         )
