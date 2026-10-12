@@ -14,12 +14,12 @@ def score_baseline_nodes(
     graph: dict[str, Any],
     model_path: str | Path,
 ) -> list[dict[str, Any]]:
-    """Score each node in one graph snapshot with a fitted baseline model."""
+    """Score source hosts in one graph snapshot with a fitted baseline model."""
     estimator, expected_features = load_baseline(model_path)
     if expected_features != NODE_FEATURE_NAMES:
         raise ValueError("Model feature schema differs from the current graph schema")
 
-    # Training labels are assigned to source hosts; do not classify destination-only nodes.
+    # Supervision is assigned to source hosts; do not classify destination-only nodes.
     nodes = [
         node for node in graph.get("nodes", [])
         if node.get("features") and float(node["features"][0]) > 0
@@ -45,7 +45,7 @@ def score_gnn_nodes(
     graph: dict[str, Any],
     model_path: str | Path,
 ) -> list[dict[str, Any]]:
-    """Score one snapshot with a saved GCN/GAT model."""
+    """Score source hosts while retaining all nodes for GNN message passing."""
     import torch
 
     from .models.gnn import create_model
@@ -59,13 +59,18 @@ def score_gnn_nodes(
     if list(saved_names) != NODE_FEATURE_NAMES:
         raise ValueError("Saved GNN feature names differ from the current graph schema")
 
-    # Keep inference aligned with source-host supervision used during training.
-    nodes = [
-        node for node in graph.get("nodes", [])
-        if node.get("features") and float(node["features"][0]) > 0
-    ]
+    nodes = graph.get("nodes", [])
     if not nodes:
         return []
+    source_positions = [
+        i for i, node in enumerate(nodes)
+        if node.get("features") and float(node["features"][0]) > 0
+    ]
+    if not source_positions:
+        return []
+
+    # Keep destination-only nodes in the graph so their features can propagate
+    # through GCN/GAT layers even though they do not receive a direct decision.
     index = {node["id"]: i for i, node in enumerate(nodes)}
     x = torch.tensor([node["features"] for node in nodes], dtype=torch.float32)
     means = checkpoint.get("scaler_mean")
@@ -83,6 +88,7 @@ def score_gnn_nodes(
         torch.tensor(edge_pairs, dtype=torch.long).t().contiguous()
         if edge_pairs else torch.empty((2, 0), dtype=torch.long)
     )
+
     model = create_model(
         model_name,
         input_dim=feature_dim,
@@ -94,9 +100,9 @@ def score_gnn_nodes(
         probabilities = torch.softmax(model(x, edge_index), dim=1)[:, 1].tolist()
     return [
         {
-            "source_ip": str(node["id"]),
-            "score": float(score),
+            "source_ip": str(nodes[position]["id"]),
+            "score": float(probabilities[position]),
             "timestamp": float(graph.get("timestamp", 0)),
         }
-        for node, score in zip(nodes, probabilities, strict=True)
+        for position in source_positions
     ]
