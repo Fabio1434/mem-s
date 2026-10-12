@@ -2,7 +2,7 @@
 
 The first collector is implemented in `sdn/ryu_app.py`.
 
-It periodically requests OpenFlow 1.3 flow statistics from connected switches and writes a CSV file:
+It periodically requests OpenFlow 1.3 flow statistics from connected switches and writes:
 
 `data/raw/flow_stats.csv`
 
@@ -20,4 +20,4 @@ The collector is observation-only at this stage. It does not modify flows or blo
 - byte_count
 - duration_sec
 
-The CSV is an intermediate research format. The feature engineering stage will later transform it into temporal graph snapshots.
+The CSV is an intermediate research format. The feature-engineering stage will later transform it into temporal graph snapshots.
