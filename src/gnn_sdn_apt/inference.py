@@ -19,7 +19,11 @@ def score_baseline_nodes(
     if expected_features != NODE_FEATURE_NAMES:
         raise ValueError("Model feature schema differs from the current graph schema")
 
-    nodes = graph.get("nodes", [])
+    # Training labels are assigned to source hosts; do not classify destination-only nodes.
+    nodes = [
+        node for node in graph.get("nodes", [])
+        if node.get("features") and float(node["features"][0]) > 0
+    ]
     if not nodes:
         return []
     matrix = np.asarray([node["features"] for node in nodes], dtype=float)
@@ -52,9 +56,14 @@ def score_gnn_nodes(
     if feature_dim != len(NODE_FEATURE_NAMES):
         raise ValueError("Saved GNN feature schema differs from the current graph schema")
 
-    nodes = graph.get("nodes", [])
+    # Keep inference aligned with source-host supervision used during training.
+    nodes = [
+        node for node in graph.get("nodes", [])
+        if node.get("features") and float(node["features"][0]) > 0
+    ]
     if not nodes:
         return []
+    source_ids = {node["id"] for node in nodes}
     index = {node["id"]: i for i, node in enumerate(nodes)}
     x = torch.tensor([node["features"] for node in nodes], dtype=torch.float32)
     edge_pairs = [
