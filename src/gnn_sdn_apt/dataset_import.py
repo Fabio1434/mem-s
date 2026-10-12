@@ -31,8 +31,8 @@ ALIASES = {
     "duration_sec": ["durationsec", "duration", "dur", "flowduration", "flowdurationus"],
     "label": ["label", "attackcat", "attackcategory", "class", "target"],
 }
-BENIGN_LABELS = {"benign", "normal", "normaltraffic", "0", "false", "none", "-", "nan"}
-UNLABELED_LABELS = {"", "unknown", "unlabeled", "unlabelled", "?"}
+BENIGN_LABELS = {"benign", "normal", "normaltraffic", "0", "false", "-"}
+UNLABELED_LABELS = {"", "unknown", "unlabeled", "unlabelled", "?", "none", "nan", "null"}
 
 
 def _resolve_column(columns: list[str], target: str) -> str | None:
