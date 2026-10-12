@@ -76,3 +76,43 @@ def test_baseline_can_calibrate_threshold_on_middle_temporal_windows(tmp_path):
     assert report["validation_observations"] > 0
     assert 0.0 <= report["threshold"] <= 1.0
     assert persisted["threshold"] == report["threshold"]
+
+
+def test_baseline_inference_returns_only_source_nodes(tmp_path):
+    from gnn_sdn_apt.inference import score_baseline_nodes
+
+    graphs = []
+    for index in range(6):
+        graphs.append({
+            "timestamp": float(100 + index * 10),
+            "nodes": [
+                {
+                    "id": "10.0.0.1",
+                    "features": [float(index + 1)] * len(NODE_FEATURE_NAMES),
+                    "label": 0,
+                },
+                {
+                    "id": "10.0.0.2",
+                    "features": [float(index + 20)] * len(NODE_FEATURE_NAMES),
+                    "label": 1,
+                },
+            ],
+            "edges": [],
+        })
+    graph_file = tmp_path / "graphs.jsonl"
+    model_file = tmp_path / "baseline.joblib"
+    report_file = tmp_path / "metrics.json"
+    write_graphs(graphs, graph_file)
+    train_baseline(graph_file, model_file, report_file)
+
+    snapshot = {
+        "timestamp": 200,
+        "nodes": [
+            {"id": "10.0.0.1", "features": [1.0] * len(NODE_FEATURE_NAMES), "label": -1},
+            {"id": "10.0.0.2", "features": [0.0] * len(NODE_FEATURE_NAMES), "label": -1},
+        ],
+        "edges": [{"source": "10.0.0.1", "target": "10.0.0.2", "features": [], "label": -1}],
+    }
+    scores = score_baseline_nodes(snapshot, model_file)
+    assert len(scores) == 1
+    assert scores[0]["source_ip"] == "10.0.0.1"
