@@ -189,28 +189,29 @@ class FlowStatsCollector(app_manager.RyuApp):
         if not os.path.exists(DECISIONS):
             return
         try:
-            with open(DECISIONS, "r", encoding="utf-8") as handle:
+            with open(DECISIONS, "rb") as handle:
                 handle.seek(self.decision_offset)
-                for line in handle:
-                    self.decision_offset = handle.tell()
-                    if not line.strip():
-                        continue
-                    try:
-                        decision = json.loads(line)
-                    except json.JSONDecodeError:
-                        self.logger.warning("Skipping invalid decision JSON line")
-                        continue
-                    if decision.get("action") != "block_source":
-                        continue
-                    try:
-                        address = ipaddress.ip_address(decision.get("source_ip", ""))
-                    except ValueError:
-                        self.logger.warning("Skipping decision with invalid source IP")
-                        continue
-                    if address not in LAB_NETWORK:
-                        self.logger.error("Refusing to block non-lab source %s", address)
-                        continue
-                    self._block_lab_source(str(address), float(decision.get("score", 0)))
+                pending = handle.read()
+                self.decision_offset = handle.tell()
+            for raw_line in pending.decode("utf-8", errors="replace").splitlines():
+                if not raw_line.strip():
+                    continue
+                try:
+                    decision = json.loads(raw_line)
+                except json.JSONDecodeError:
+                    self.logger.warning("Skipping invalid decision JSON line")
+                    continue
+                if decision.get("action") != "block_source":
+                    continue
+                try:
+                    address = ipaddress.ip_address(decision.get("source_ip", ""))
+                except ValueError:
+                    self.logger.warning("Skipping decision with invalid source IP")
+                    continue
+                if address not in LAB_NETWORK:
+                    self.logger.error("Refusing to block non-lab source %s", address)
+                    continue
+                self._block_lab_source(str(address), float(decision.get("score", 0)))
         except OSError:
             self.logger.exception("Could not read decision queue")
 
