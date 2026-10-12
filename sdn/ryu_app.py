@@ -25,6 +25,7 @@ from ryu.ofproto import ofproto_v1_3
 
 OUTPUT = os.path.join("data", "raw", "flow_stats.csv")
 DECISIONS = os.path.join("data", "processed", "decisions.jsonl")
+MITIGATION_EVENTS = os.path.join("data", "processed", "mitigation_events.jsonl")
 LAB_NETWORK = ipaddress.ip_network("10.0.0.0/24")
 
 
@@ -220,12 +221,14 @@ class FlowStatsCollector(app_manager.RyuApp):
                 if address not in LAB_NETWORK:
                     self.logger.error("Refusing to block non-lab source %s", address)
                     continue
-                self._block_lab_source(str(address), float(decision.get("score", 0)))
+                self._block_lab_source(decision)
         except OSError:
             self.logger.exception("Could not read decision queue")
 
-    def _block_lab_source(self, source_ip, score):
-        """Install a temporary drop rule for one source IP on lab datapaths."""
+    def _block_lab_source(self, decision):
+        """Install a temporary drop rule and log decision-to-action timing."""
+        source_ip = str(decision["source_ip"])
+        score = float(decision.get("score", 0))
         for datapath in list(self.datapaths.values()):
             parser = datapath.ofproto_parser
             match = parser.OFPMatch(eth_type=0x0800, ipv4_src=source_ip)
@@ -236,11 +239,28 @@ class FlowStatsCollector(app_manager.RyuApp):
                 actions=[],
                 hard_timeout=self.block_timeout_seconds,
             )
+
+        applied_at = time.time()
+        created_at = float(decision.get("created_at", applied_at))
+        event = {
+            "source_ip": source_ip,
+            "score": score,
+            "action": "block_source",
+            "decision_created_at": created_at,
+            "action_applied_at": applied_at,
+            "decision_action_latency_seconds": max(0.0, applied_at - created_at),
+            "hard_timeout_seconds": self.block_timeout_seconds,
+            "datapaths": sorted(self.datapaths.keys()),
+        }
+        os.makedirs(os.path.dirname(MITIGATION_EVENTS), exist_ok=True)
+        with open(MITIGATION_EVENTS, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, allow_nan=False) + "\n")
         self.logger.warning(
-            "Temporary lab block installed for %s (score=%.3f, timeout=%ss)",
+            "Temporary lab block installed for %s (score=%.3f, timeout=%ss, decision-action=%.3fs)",
             source_ip,
             score,
             self.block_timeout_seconds,
+            event["decision_action_latency_seconds"],
         )
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
