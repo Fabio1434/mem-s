@@ -38,7 +38,7 @@ def label_flow(
         (annotations["timestamp_start"] <= timestamp)
         & (annotations["timestamp_end"] >= timestamp)
     ]
-    for row in eligible.itertuples(index=False):
+    eligible = eligible.sort_values("timestamp_start", ascending=False)\n    for row in eligible.itertuples(index=False):
         expected_src = str(row.src_ip).strip()
         expected_dst = str(row.dst_ip).strip()
         if expected_src and expected_src.lower() != "nan" and expected_src != src_ip:
