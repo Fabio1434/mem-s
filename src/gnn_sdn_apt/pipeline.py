@@ -25,7 +25,9 @@ def build_dataset(
     graph_config = config["graph"]
 
     input_path = Path(raw_path or paths["raw_flows"])
-    labels_path = annotations_path if annotations_path is not None else paths["scenario_labels"]
+    labels_path = annotations_path if annotations_path is not None else (
+        paths["scenario_labels"] if raw_path is None else None
+    )
     features_path = Path(paths["features"])
     graphs_path = Path(paths["graphs"])
     default_window = float(graph_config.get("temporal_window_seconds", 10))
