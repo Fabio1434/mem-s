@@ -6,8 +6,13 @@ from mininet.cli import CLI
 from mininet.log import info, setLogLevel
 from mininet.net import Mininet
 from mininet.node import OVSSwitch, RemoteController
+import sys
+from pathlib import Path
+
 from mininet.topo import Topo
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 from simulation.scenarios import run_scenario
 
 
