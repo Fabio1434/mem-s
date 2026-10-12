@@ -22,7 +22,20 @@ Pour activer les modèles GNN :
 
 Si les dépendances PyTorch doivent correspondre à CUDA, installer d'abord la version PyTorch adaptée à la machine puis installer PyTorch Geometric selon leurs instructions officielles.
 
-## 2. Démarrer le laboratoire
+## 2. Smoke test logiciel sans Mininet
+
+Cette étape valide le pipeline Python de bout en bout sur une capture entièrement synthétique. Elle ne nécessite ni Ryu ni Open vSwitch et ne constitue pas une expérience de détection réelle.
+
+    python scripts/run_demo.py --output-dir data/demo
+
+La commande produit la capture, les annotations, les features, les graphes, un modèle Random Forest et un rapport. Pour ajouter une vérification d'entraînement GCN et GAT :
+
+    pip install -e ".[ml]"
+    python scripts/run_demo.py --output-dir data/demo --with-gnn --epochs 3
+
+Les sorties sont séparées des captures réelles dans data/demo/. Le dépôt ignore ces artefacts générés. Les métriques synthétiques ne doivent pas être utilisées pour soutenir les hypothèses du mémoire.
+
+## 3. Démarrer le laboratoire
 
 Terminal 1 — contrôleur et collecte :
 
@@ -57,7 +70,7 @@ La suppression n'a lieu qu'avec une confirmation explicite :
 
 Le script ne supprime ni les modèles entraînés ni les rapports.
 
-## 3. Construire le dataset de graphes
+## 4. Construire le dataset de graphes
 
 Après avoir collecté des flux et lancé des scénarios normaux et suspects :
 
@@ -70,7 +83,7 @@ Produits créés :
 
 Une observation sans annotation correspond au label -1, pas à une observation normale. Les annotations du laboratoire utilisent 0 pour normal et 1 pour suspect.
 
-## 4. Entraîner la baseline classique
+## 5. Entraîner la baseline classique
 
     gnn-sdn-apt train-baseline --calibrate-threshold
     gnn-sdn-apt inspect
@@ -81,7 +94,7 @@ Artefacts :
 
 La baseline Random Forest est la référence de comparaison. Le rapport indique si le découpage temporel a pu être utilisé. Quand il y a trop peu de fenêtres, un repli au niveau des observations est marqué explicitement ; il ne faut pas le présenter comme une évaluation temporelle indépendante.
 
-## 5. Entraîner un GCN ou un GAT
+## 6. Entraîner un GCN ou un GAT
 
 Après la baseline, installer l'extra ML et collecter suffisamment de graphes annotés dans plusieurs fenêtres temporelles :
 
@@ -93,7 +106,7 @@ Artefacts : modèles .pt et rapports JSON correspondants dans models/checkpoints
 
 L'entraînement GNN utilise un découpage chronologique par snapshots. Avec --calibrate-threshold et au moins six snapshots utilisables, les snapshots les plus anciens servent à l'entraînement, les suivants à la calibration du seuil et les plus récents au test final. Chaque partition doit contenir les deux classes. Si les données ne permettent pas un tel découpage, le code revient à un seuil fixe configuré et le rapport le signale.
 
-## 6. Inférence en quasi-temps réel
+## 7. Inférence en quasi-temps réel
 
 Après entraînement du modèle choisi, lancer le service suivant dans un autre terminal :
 
@@ -107,7 +120,7 @@ Utiliser --model gcn ou --model gat après entraînement de ces modèles. Les sc
 
 Le seuil de 0,90 est un paramètre de départ, pas un résultat validé. Il doit être sélectionné à partir des mesures sur le jeu de validation, avant l'évaluation finale.
 
-## 7. Mitigation contrôlée
+## 8. Mitigation contrôlée
 
 La mitigation est désactivée par défaut. Pour l'activer, deux conditions sont requises :
 1. config/config.yaml doit contenir mitigation.enabled: true ;
@@ -127,7 +140,7 @@ Après une expérience de mitigation, résumer les horodatages décision-action 
 
     gnn-sdn-apt summarize-mitigation
 
-## 8. Tests automatisés
+## 9. Tests automatisés
 
     pip install -e ".[dev]"
     python -m compileall -q src simulation sdn scripts
