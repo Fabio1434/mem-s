@@ -30,4 +30,4 @@ Aucune mitigation automatique n'est encore activée. Cette séparation permet de
 10. Mitigation SDN
 11. Évaluation
 
-Voir `docs/` pour la conception détaillée et `simulation/` + `sdn/` pour la première implémentation.
+Voir `docs/` pour la conception détaillée, `docs/07_execution.md` pour lancer le laboratoire, et `simulation/` + `sdn/` pour la première implémentation.
