@@ -2,21 +2,36 @@ project:
   name: gnn-sdn-apt-detection
   mode: research
 
+paths:
+  raw_flows: data/raw/flow_stats.csv
+  scenario_labels: data/raw/scenario_labels.csv
+  features: data/processed/flow_features.csv
+  graphs: data/processed/graphs.jsonl
+  models: models/checkpoints
+  reports: reports
+  alerts: data/processed/alerts.jsonl
+  decisions: data/processed/decisions.jsonl
+
 graph:
   directed: true
   temporal_window_seconds: 10
 
 detection:
-  model: gcn
+  # Train the classical baseline first; switch to gcn or gat after the GNN is trained.
+  model: baseline
   threshold: 0.90
 
 mitigation:
+  # Keep false until detection has been experimentally evaluated.
   enabled: false
   default_action: alert
+  block_timeout_seconds: 60
 
 sdn:
   controller: ryu
   openflow_version: "1.3"
+  controller_host: "127.0.0.1"
+  controller_port: 6653
 
 logging:
   level: INFO
