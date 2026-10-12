@@ -32,11 +32,13 @@ def main() -> None:
 
     baseline = commands.add_parser("train-baseline", help="train and evaluate Random Forest")
     baseline.add_argument("--model-out", default=None)
+    baseline.add_argument("--threshold", type=float, default=None)
     baseline.add_argument("--report-out", default=None)
 
     gnn = commands.add_parser("train-gnn", help="train a temporal GCN or GAT")
     gnn.add_argument("--model", choices=["gcn", "gat"], default="gcn")
     gnn.add_argument("--epochs", type=int, default=100)
+    gnn.add_argument("--threshold", type=float, default=None)
     gnn.add_argument("--model-out", default=None)
     gnn.add_argument("--report-out", default=None)
 
@@ -58,7 +60,8 @@ def main() -> None:
 
         model_path = args.model_out or str(Path(paths["models"]) / "baseline.joblib")
         report_path = args.report_out or str(Path(paths["reports"]) / "baseline_metrics.json")
-        _print_json(train_baseline(paths["graphs"], model_path, report_path))
+        threshold = args.threshold if args.threshold is not None else float(config["detection"]["threshold"])
+        _print_json(train_baseline(paths["graphs"], model_path, report_path, threshold=threshold))
     elif args.command == "train-gnn":
         from .models.train_gnn import train_gnn
 
@@ -68,6 +71,7 @@ def main() -> None:
             train_gnn(
                 paths["graphs"], model_path, report_path,
                 model_name=args.model, epochs=args.epochs,
+                threshold=args.threshold if args.threshold is not None else float(config["detection"]["threshold"]),
             )
         )
     elif args.command == "inspect":
