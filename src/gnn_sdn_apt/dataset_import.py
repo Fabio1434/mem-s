@@ -62,7 +62,7 @@ def _labels(series: pd.Series | None, count: int) -> tuple[list[int], list[str]]
         if token in BENIGN_LABELS:
             labels.append(0)
             scenarios.append("normal")
-        elif token in UNLABELED_LABELS:
+        elif token in UNLABELED_LABELS or (pd.notna(number) and number < 0):
             labels.append(-1)
             scenarios.append("unlabeled")
         elif pd.notna(number) and number in (0, 1):
