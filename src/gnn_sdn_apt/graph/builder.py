@@ -24,11 +24,11 @@ def build_graph_snapshots(
     flows: pd.DataFrame,
     window_seconds: int = 10,
 ) -> list[dict[str, Any]]:
-    """Build one graph document per time window.
+    """Build one directed graph per time window with one-window temporal features.
 
     Nodes are IP endpoints. A node label describes the observed source host:
     1 if its outgoing flow is annotated suspicious, 0 if normal, and -1 if
-    there is no ground truth for that host in that window.
+    there is no ground truth for that host in the window.
     """
     if window_seconds <= 0:
         raise ValueError("window_seconds must be positive")
@@ -36,9 +36,7 @@ def build_graph_snapshots(
         return []
 
     data = flows.copy()
-    for required in [
-        "timestamp", "ip_src", "ip_dst", "label", *FLOW_FEATURE_COLUMNS
-    ]:
+    for required in ["timestamp", "ip_src", "ip_dst", "label", *FLOW_FEATURE_COLUMNS]:
         if required not in data.columns:
             data[required] = -1 if required == "label" else 0
 
@@ -57,8 +55,18 @@ def build_graph_snapshots(
 
     data["window_id"] = (data["timestamp"] // window_seconds).astype("int64")
     snapshots: list[dict[str, Any]] = []
+    previous_out_flows: dict[str, float] = {}
+    previous_destinations: dict[str, set[str]] = {}
+    previous_streak: dict[str, int] = {}
+    previous_window_id: int | None = None
 
     for window_id, group in data.groupby("window_id", sort=True):
+        window_id = int(window_id)
+        if previous_window_id is not None and window_id > previous_window_id + 1:
+            previous_out_flows = {}
+            previous_destinations = {}
+            previous_streak = {}
+
         graph = nx.DiGraph()
         node_labels: dict[str, list[int]] = defaultdict(list)
         edge_records: dict[tuple[str, str], list[dict[str, float]]] = defaultdict(list)
@@ -68,20 +76,20 @@ def build_graph_snapshots(
             label = int(_safe_number(row.get("label", -1), -1))
             if label in (0, 1):
                 node_labels[src].append(label)
-
             graph.add_node(src)
             graph.add_node(dst)
             edge_records[(src, dst)].append(
-                {
-                    feature: _safe_number(row.get(feature, 0))
-                    for feature in EDGE_FEATURES
-                }
+                {feature: _safe_number(row.get(feature, 0)) for feature in EDGE_FEATURES}
             )
 
         for (src, dst), records in edge_records.items():
             graph.add_edge(src, dst, records=records)
 
         node_rows: list[dict[str, Any]] = []
+        current_out_flows: dict[str, float] = {}
+        current_destinations: dict[str, set[str]] = {}
+        current_streak: dict[str, int] = {}
+
         for node in sorted(graph.nodes):
             outgoing = [
                 record
@@ -96,14 +104,19 @@ def build_graph_snapshots(
             outgoing_rows = group[group["src_ip"] == node]
             incoming_rows = group[group["dst_ip"] == node]
 
-            dst_ports = set()
-            for value in outgoing_rows.get("dst_port_num", pd.Series(dtype=float)).tolist():
-                number = int(_safe_number(value, -1))
-                if number >= 0:
-                    dst_ports.add(number)
+            destinations = set(outgoing_rows["dst_ip"].astype(str).tolist())
+            dst_ports = {
+                int(_safe_number(value, -1))
+                for value in outgoing_rows.get("dst_port_num", pd.Series(dtype=float)).tolist()
+                if int(_safe_number(value, -1)) >= 0
+            }
+            out_count = float(len(outgoing))
+            previous_count = previous_out_flows.get(node, 0.0)
+            previous_targets = previous_destinations.get(node, set())
+            streak = previous_streak.get(node, 0) + 1 if out_count > 0 else 0
 
             feature_values = [
-                float(len(outgoing)),
+                out_count,
                 float(len(incoming)),
                 float(outgoing_rows["dst_ip"].nunique()),
                 float(incoming_rows["src_ip"].nunique()),
@@ -115,17 +128,23 @@ def build_graph_snapshots(
                 _mean([item["packet_rate"] for item in outgoing]),
                 _mean([item["byte_rate"] for item in outgoing]),
                 _mean([item["duration_sec"] for item in outgoing]),
+                1.0 if previous_count > 0 else 0.0,
+                out_count - previous_count,
+                float(len(destinations - previous_targets)),
+                float(streak),
             ]
             labels = node_labels.get(node, [])
             node_label = max(labels) if labels else -1
-            node_rows.append(
-                {
-                    "id": node,
-                    "features": feature_values,
-                    "label": node_label,
-                    "label_count": len(labels),
-                }
-            )
+            node_rows.append({
+                "id": node,
+                "features": feature_values,
+                "label": node_label,
+                "label_count": len(labels),
+            })
+
+            current_out_flows[node] = out_count
+            current_destinations[node] = destinations
+            current_streak[node] = streak
 
         edge_rows: list[dict[str, Any]] = []
         for (src, dst), records in sorted(edge_records.items()):
@@ -133,32 +152,33 @@ def build_graph_snapshots(
                 (group["src_ip"] == src) & (group["dst_ip"] == dst)
             ]["label"].tolist()
             known_labels = [
-                int(_safe_number(value, -1)) for value in edge_label_values
+                int(_safe_number(value, -1))
+                for value in edge_label_values
                 if int(_safe_number(value, -1)) in (0, 1)
             ]
-            edge_rows.append(
-                {
-                    "source": src,
-                    "target": dst,
-                    "features": [
-                        _mean([item[name] for item in records])
-                        for name in EDGE_FEATURES
-                    ],
-                    "label": max(known_labels) if known_labels else -1,
-                    "observations": len(records),
-                }
-            )
+            edge_rows.append({
+                "source": src,
+                "target": dst,
+                "features": [
+                    _mean([item[name] for item in records]) for name in EDGE_FEATURES
+                ],
+                "label": max(known_labels) if known_labels else -1,
+                "observations": len(records),
+            })
 
-        snapshots.append(
-            {
-                "timestamp": float(group["timestamp"].max()),
-                "window_id": int(window_id),
-                "node_feature_names": NODE_FEATURE_NAMES,
-                "edge_feature_names": EDGE_FEATURES,
-                "nodes": node_rows,
-                "edges": edge_rows,
-            }
-        )
+        snapshots.append({
+            "timestamp": float(group["timestamp"].max()),
+            "window_id": window_id,
+            "node_feature_names": NODE_FEATURE_NAMES,
+            "edge_feature_names": EDGE_FEATURES,
+            "nodes": node_rows,
+            "edges": edge_rows,
+        })
+        previous_out_flows = current_out_flows
+        previous_destinations = current_destinations
+        previous_streak = current_streak
+        previous_window_id = window_id
+
     return snapshots
 
 
