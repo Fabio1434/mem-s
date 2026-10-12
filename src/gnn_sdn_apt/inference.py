@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from .models.baseline import load_baseline
+from .models.baseline import load_baseline, load_baseline_threshold
 from .schema import NODE_FEATURE_NAMES
 
 
@@ -110,3 +110,22 @@ def score_gnn_nodes(
         }
         for position in source_positions
     ]
+
+
+
+def load_saved_threshold(
+    model_name: str,
+    model_path: str | Path,
+    fallback: float = 0.9,
+) -> float:
+    """Load the threshold persisted alongside a trained baseline/GNN artifact."""
+    if model_name.lower() == "baseline":
+        return load_baseline_threshold(model_path, fallback=fallback)
+
+    import torch
+
+    checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
+    threshold = float(checkpoint.get("threshold", fallback))
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError("Saved model threshold must be in the [0, 1] interval")
+    return threshold
