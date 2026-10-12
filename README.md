@@ -59,12 +59,12 @@ Après la collecte de flux et l'annotation des scénarios :
 
     gnn-sdn-apt prepare
     gnn-sdn-apt inspect
-    gnn-sdn-apt train-baseline
-    gnn-sdn-apt train-gnn --model gcn --epochs 100
-    gnn-sdn-apt train-gnn --model gat --epochs 100
+    gnn-sdn-apt train-baseline --calibrate-threshold
+    gnn-sdn-apt train-gnn --model gcn --epochs 100 --calibrate-threshold
+    gnn-sdn-apt train-gnn --model gat --epochs 100 --calibrate-threshold
     gnn-sdn-apt compare
 
-Les commandes GCN/GAT requièrent l'extra ML. Il faut collecter suffisamment de fenêtres annotées comprenant les deux classes avant l'entraînement. Les métriques sont sauvegardées dans reports/.
+Les commandes GCN/GAT requièrent l'extra ML. Il faut collecter suffisamment de fenêtres annotées comprenant les deux classes avant l'entraînement. Avec --calibrate-threshold et suffisamment de snapshots, un seuil est choisi sur une partition chronologique de validation séparée. Si ce découpage n'est pas viable, le seuil configuré est conservé et indiqué dans le rapport. Les métriques sont sauvegardées dans reports/.
 
 ## Inférence et mitigation optionnelle
 
