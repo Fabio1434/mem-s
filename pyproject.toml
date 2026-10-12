@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gnn-sdn-apt"
+version = "0.1.0"
+description = "Research prototype for graph-based threat detection in a controlled SDN lab"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "networkx>=3.0",
+  "PyYAML>=6.0",
+  "scikit-learn>=1.3",
+  "joblib>=1.3"
+]
+
+[project.optional-dependencies]
+ml = ["torch>=2.1", "torch-geometric>=2.4"]
+dev = ["pytest>=7.4", "ruff>=0.4"]
+
+[project.scripts]
+gnn-sdn-apt = "gnn_sdn_apt.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
