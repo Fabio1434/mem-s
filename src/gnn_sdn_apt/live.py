@@ -21,6 +21,7 @@ from .inference import score_baseline_nodes, score_gnn_nodes
 from .features import prepare_flow_file
 
 LOGGER = logging.getLogger("gnn_sdn_apt.live")
+_LAST_EMITTED: dict[tuple[str, str], float] = {}
 
 
 def _append_jsonl(path: str | Path, record: dict[str, Any]) -> None:
@@ -82,9 +83,15 @@ def run_once(
         and os.getenv("GNN_SDN_MITIGATION", "0") == "1"
     )
     emitted = 0
+    cooldown = float(config.get("mitigation", {}).get("block_timeout_seconds", 60))
     for item in scores:
         if item["score"] < threshold:
             continue
+        key = (item["source_ip"], model_name)
+        now = time.time()
+        if now - _LAST_EMITTED.get(key, 0.0) < cooldown:
+            continue
+        _LAST_EMITTED[key] = now
         record = {
             **item,
             "threshold": threshold,
@@ -92,7 +99,7 @@ def run_once(
             "action": "block_source" if mitigation_enabled else "alert",
             "model": model_name,
             "mitigation_enabled": mitigation_enabled,
-            "created_at": time.time(),
+            "created_at": now,
         }
         _append_jsonl(paths["alerts"], record)
         _append_jsonl(paths["decisions"], record)
