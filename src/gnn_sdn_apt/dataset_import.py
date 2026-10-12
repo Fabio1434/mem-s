@@ -142,6 +142,7 @@ def import_flow_csv(input_path: str | Path, output_path: str | Path) -> dict[str
         "duration_sec": duration,
         "label": labels,
         "scenario": scenarios,
+        "record_mode": "flow_record",
     })
     normalized = normalized.dropna(subset=["timestamp"]).sort_values("timestamp")
     destination = Path(output_path)
