@@ -12,6 +12,9 @@ Depuis la racine du dépôt :
     source .venv/bin/activate
     python -m pip install --upgrade pip
     pip install -e ".[dev]"
+    python scripts/check_environment.py
+
+Le diagnostic signale aussi les dépendances système Mininet/Open vSwitch/Ryu et indique si le contrôleur écoute déjà sur le port 6653.
 
 Pour activer les modèles GNN :
 
@@ -42,7 +45,17 @@ Dans la CLI Mininet :
 
 Les scénarios ne déploient aucun exploit. La reconnaissance et le mouvement latéral sont des tentatives TCP bornées vers les IPs privées de la topologie. Le transfert dit « exfil » envoie uniquement des données factices de taille fixe vers un récepteur du laboratoire.
 
-Chaque commande de scénario écrit une annotation dans data/raw/scenario_labels.csv. Le contrôleur écrit les statistiques OpenFlow dans data/raw/flow_stats.csv.
+Chaque commande de scénario écrit une annotation dans data/raw/scenario_labels.csv. Le contrôleur écrit les statistiques OpenFlow dans data/raw/flow_stats.csv. Attendre au moins 10 secondes entre les commandes de scénario pour réduire le chevauchement des fenêtres d'annotation.
+
+Pour recommencer une expérience avec des captures vierges, arrêter Ryu et Mininet puis afficher d'abord les fichiers qui seraient supprimés :
+
+    python scripts/reset_lab_data.py
+
+La suppression n'a lieu qu'avec une confirmation explicite :
+
+    python scripts/reset_lab_data.py --yes
+
+Le script ne supprime ni les modèles entraînés ni les rapports.
 
 ## 3. Construire le dataset de graphes
 
@@ -88,7 +101,7 @@ Après entraînement du modèle choisi, lancer le service suivant dans un autre 
 
 Le nom de commande exposé par le package peut être lancé de façon équivalente avec :
 
-    python -m gnn_sdn_apt.live --model baseline --interval 5
+    gnn-sdn-apt-live --model baseline --interval 5
 
 Utiliser --model gcn ou --model gat après entraînement de ces modèles. Les scores au-dessus du seuil sont ajoutés à data/processed/alerts.jsonl et data/processed/decisions.jsonl.
 
@@ -100,15 +113,24 @@ La mitigation est désactivée par défaut. Pour l'activer, deux conditions sont
 1. config/config.yaml doit contenir mitigation.enabled: true ;
 2. le contrôleur Ryu doit démarrer avec GNN_SDN_MITIGATION=1.
 
-Exemple uniquement dans le laboratoire :
+Exemple uniquement dans le laboratoire, après avoir mis mitigation.enabled à true dans config/config.yaml. Démarrer d'abord Ryu :
 
     GNN_SDN_MITIGATION=1 ryu-manager --ofp-tcp-listen-port 6653 sdn/ryu_app.py
 
+Puis lancer également le service d'inférence avec la même variable :
+
+    GNN_SDN_MITIGATION=1 gnn-sdn-apt-live --model baseline --interval 5
+
 Le contrôleur n'accepte les ordres de blocage que pour une adresse IPv4 dans 10.0.0.0/24. Les règles de blocage expirent après 60 secondes. Il faut conserver le mode alerte pendant le développement et ne tester le blocage qu'après analyse des faux positifs.
+
+Après une expérience de mitigation, résumer les horodatages décision-action enregistrés par Ryu :
+
+    gnn-sdn-apt summarize-mitigation
 
 ## 8. Tests automatisés
 
     pip install -e ".[dev]"
+    python -m compileall -q src simulation sdn scripts
     pytest -q
 
 Le workflow GitHub Actions lance les tests unitaires à chaque push et pull request. Les tests Mininet/Ryu de bout en bout nécessitent une VM Linux configurée et doivent être validés dans cet environnement.
