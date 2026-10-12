@@ -17,9 +17,10 @@
 ## Phase 3 — Pipeline de données
 - [x] Définir les schémas des flux, annotations et graphes
 - [x] Calculer deltas de compteurs et débits
+- [x] Distinguer les compteurs OpenFlow cumulatifs des lignes de flux indépendantes importées
 - [x] Construire des snapshots de graphes temporels NetworkX
 - [x] Sérialiser les graphes en JSONL
-- [x] Ajouter des tests unitaires
+- [x] Ajouter des tests unitaires et une capture synthétique reproductible
 - [ ] Valider le volume et la qualité des données réelles du laboratoire
 
 ## Phase 4 — Modèles IA
@@ -35,22 +36,23 @@
 - [x] Score de menace et seuil configurable
 - [x] Journaux d'alertes et de décisions
 - [x] Cooldown des alertes par hôte
-- [ ] Calibrer le seuil avec un jeu de validation dédié
+- [ ] Calibrer le seuil avec un jeu de validation réel dédié
 
 ## Phase 6 — Mitigation SDN
 - [x] Liaison des décisions au contrôleur Ryu
 - [x] Blocage IPv4 temporaire en laboratoire, explicitement désactivé par défaut
-- [x] Garde-fou sur le sous-réseau 10.0.0.0/24 et expiration après 60 s
+- [x] Garde-fou en défense en profondeur sur le sous-réseau 10.0.0.0/24 et expiration après 60 s
 - [ ] Mesurer le délai de décision-action et l'impact sur le trafic légitime
 - [ ] Évaluer les faux positifs avant toute activation contrôlée
 
 ## Phase 7 — Validation scientifique
 - [x] Protocole d'évaluation documenté
 - [x] Dictionnaire des données et limitations documentés
-- [x] Workflow GitHub Actions pour les tests unitaires
-- [ ] Exécuter les tests unitaires sur l'état complet du dépôt
+- [x] Tests du pipeline complet sur une capture synthétique pour la baseline
+- [x] Tests de fumée GCN et GAT et workflow CI qui installe l'extra ML
+- [ ] Confirmer que le workflow GitHub Actions a terminé avec succès
 - [ ] Valider l'intégration Mininet/Ryu sur VM Linux
-- [ ] Comparer les modèles sur les mêmes données et partitions
+- [ ] Comparer les modèles sur les mêmes données réelles et partitions
 - [ ] Analyser les limites et documenter la reproductibilité
 
-**Important :** un module marqué comme implémenté n'est pas considéré comme expérimentalement validé tant que son test et ses mesures ne sont pas réalisés.
+**Important :** les tests synthétiques valident le fonctionnement du logiciel, pas la performance du modèle sur des attaques réelles. Un module marqué comme implémenté n'est pas considéré comme expérimentalement validé tant que ses tests et mesures réelles ne sont pas réalisés.
