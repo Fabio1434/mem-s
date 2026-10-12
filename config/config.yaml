@@ -11,6 +11,7 @@ paths:
   reports: reports
   alerts: data/processed/alerts.jsonl
   decisions: data/processed/decisions.jsonl
+  mitigation_events: data/processed/mitigation_events.jsonl
 
 graph:
   directed: true
