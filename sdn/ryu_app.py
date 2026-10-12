@@ -240,6 +240,7 @@ class FlowStatsCollector(app_manager.RyuApp):
             "Temporary lab block installed for %s (score=%.3f, timeout=%ss)",
             source_ip,
             score,
+            self.block_timeout_seconds,
         )
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
