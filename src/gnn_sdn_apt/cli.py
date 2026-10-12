@@ -6,8 +6,7 @@ import json
 from pathlib import Path
 
 from .config import load_config
-from .graph.builder import build_graph_snapshots
-from .graph.io import read_graphs, write_graphs
+from .graph.io import read_graphs
 from .pipeline import build_dataset
 
 
@@ -18,12 +17,19 @@ def _print_json(value):
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="gnn-sdn-apt",
-        description="Research pipeline for graph-based threat detection in an isolated SDN lab",
+        description="Graph-based threat detection pipeline for a controlled SDN lab",
     )
     parser.add_argument("--config", default="config/config.yaml", help="YAML configuration file")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    commands.add_parser("prepare", help="normalize raw OpenFlow counters and build graph snapshots")
+    prepare = commands.add_parser("prepare", help="normalize flows and build graph snapshots")
+    prepare.add_argument("--raw-input", default=None, help="override configured raw flow file")
+    prepare.add_argument("--labels", default=None, help="override configured scenario labels file")
+
+    importer = commands.add_parser("import-csv", help="normalize a timestamped public flow dataset")
+    importer.add_argument("--input", required=True, help="input CSV, e.g. a CICFlowMeter export")
+    importer.add_argument("--output", default="data/raw/public_flows.csv")
+
     baseline = commands.add_parser("train-baseline", help="train and evaluate Random Forest")
     baseline.add_argument("--model-out", default=None)
     baseline.add_argument("--report-out", default=None)
@@ -34,7 +40,7 @@ def main() -> None:
     gnn.add_argument("--model-out", default=None)
     gnn.add_argument("--report-out", default=None)
 
-    inspect = commands.add_parser("inspect", help="show dataset and label counts")
+    inspect = commands.add_parser("inspect", help="show graph dataset and label counts")
     inspect.add_argument("--graphs", default=None)
 
     args = parser.parse_args()
@@ -42,7 +48,11 @@ def main() -> None:
     paths = config["paths"]
 
     if args.command == "prepare":
-        _print_json(build_dataset(args.config))
+        _print_json(build_dataset(args.config, raw_path=args.raw_input, annotations_path=args.labels))
+    elif args.command == "import-csv":
+        from .dataset_import import import_flow_csv
+
+        _print_json(import_flow_csv(args.input, args.output))
     elif args.command == "train-baseline":
         from .models.baseline import train_baseline
 
