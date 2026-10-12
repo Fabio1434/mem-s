@@ -55,6 +55,9 @@ def score_gnn_nodes(
     feature_dim = int(checkpoint.get("feature_dim", len(NODE_FEATURE_NAMES)))
     if feature_dim != len(NODE_FEATURE_NAMES):
         raise ValueError("Saved GNN feature schema differs from the current graph schema")
+    saved_names = checkpoint.get("feature_names", NODE_FEATURE_NAMES)
+    if list(saved_names) != NODE_FEATURE_NAMES:
+        raise ValueError("Saved GNN feature names differ from the current graph schema")
 
     # Keep inference aligned with source-host supervision used during training.
     nodes = [
@@ -63,9 +66,14 @@ def score_gnn_nodes(
     ]
     if not nodes:
         return []
-    source_ids = {node["id"] for node in nodes}
     index = {node["id"]: i for i, node in enumerate(nodes)}
     x = torch.tensor([node["features"] for node in nodes], dtype=torch.float32)
+    means = checkpoint.get("scaler_mean")
+    scales = checkpoint.get("scaler_scale")
+    if means is not None and scales is not None:
+        mean_tensor = torch.tensor(means, dtype=torch.float32)
+        scale_tensor = torch.tensor(scales, dtype=torch.float32).clamp_min(1e-12)
+        x = (x - mean_tensor) / scale_tensor
     edge_pairs = [
         [index[edge["source"]], index[edge["target"]]]
         for edge in graph.get("edges", [])
