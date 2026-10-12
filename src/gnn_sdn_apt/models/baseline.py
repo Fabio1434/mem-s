@@ -41,6 +41,29 @@ def _node_table(graphs: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray, n
     return np.asarray(features, dtype=float), np.asarray(labels, dtype=int), np.asarray(times)
 
 
+def _temporal_three_way_split(
+    x: np.ndarray, y: np.ndarray, times: np.ndarray
+) -> tuple[np.ndarray, ...] | None:
+    """Use early snapshots for fitting, middle snapshots for threshold validation and late ones for test."""
+    unique_times = np.unique(times)
+    if len(unique_times) < 6:
+        return None
+    train_cut = max(2, int(len(unique_times) * 0.6))
+    validation_cut = max(train_cut + 1, int(len(unique_times) * 0.8))
+    validation_cut = min(validation_cut, len(unique_times) - 1)
+    train_mask = times < unique_times[train_cut]
+    validation_mask = (times >= unique_times[train_cut]) & (times < unique_times[validation_cut])
+    test_mask = times >= unique_times[validation_cut]
+    masks = (train_mask, validation_mask, test_mask)
+    if any(mask.sum() == 0 or len(np.unique(y[mask])) != 2 for mask in masks):
+        return None
+    return (
+        x[train_mask], y[train_mask],
+        x[validation_mask], y[validation_mask],
+        x[test_mask], y[test_mask],
+    )
+
+
 def _temporal_split(
     x: np.ndarray,
     y: np.ndarray,
@@ -65,13 +88,39 @@ def _temporal_split(
     return x_train, x_test, y_train, y_test, "stratified-node-fallback"
 
 
+def _choose_threshold(
+    y_true: np.ndarray,
+    scores: np.ndarray,
+    configured_threshold: float,
+) -> tuple[float, dict[str, float]]:
+    """Select a threshold on validation F1; ties prefer fewer false positives."""
+    candidates = sorted(set(np.linspace(0.05, 0.95, 19).tolist() + [configured_threshold]))
+    best_threshold = configured_threshold
+    best_metrics: tuple[float, float, float] = (-1.0, -1.0, -1.0)
+    for candidate in candidates:
+        predicted = (scores >= candidate).astype(int)
+        matrix = confusion_matrix(y_true, predicted, labels=[0, 1])
+        tn, fp, _fn, _tp = matrix.ravel()
+        f1 = float(f1_score(y_true, predicted, zero_division=0))
+        fpr = float(fp / (fp + tn)) if tn + fp else 0.0
+        key = (f1, -fpr, candidate)
+        if key > best_metrics:
+            best_metrics = key
+            best_threshold = float(candidate)
+    return best_threshold, {
+        "validation_f1": float(best_metrics[0]),
+        "validation_false_positive_rate": float(-best_metrics[1]),
+    }
+
+
 def train_baseline(
     graphs_path: str | Path,
     model_path: str | Path,
     report_path: str | Path,
     threshold: float = 0.9,
+    calibrate_threshold: bool = False,
 ) -> dict[str, Any]:
-    """Train a Random Forest and store model plus a metrics JSON report."""
+    """Train Random Forest; optionally tune threshold on a separate temporal validation split."""
     if not 0.0 <= threshold <= 1.0:
         raise ValueError("threshold must be in the [0, 1] interval")
     graphs = read_graphs(graphs_path)
@@ -87,42 +136,60 @@ def train_baseline(
             "Check scenario_labels.csv before training."
         )
 
-    x_train, x_test, y_train, y_test, split_method = _temporal_split(x, y, times)
+    three_way = _temporal_three_way_split(x, y, times) if calibrate_threshold else None
+    validation_metrics: dict[str, float] = {}
+    if three_way is not None:
+        x_train, y_train, x_validation, y_validation, x_test, y_test = three_way
+        split_method = "temporal-train-validation-test"
+    else:
+        x_train, x_test, y_train, y_test, split_method = _temporal_split(x, y, times)
+        x_validation = y_validation = None
+
     if len(np.unique(y_train)) != 2:
         raise ValueError("Training split contains only one class; collect more varied scenarios.")
 
-    estimator = Pipeline(
-        [
-            ("imputer", SimpleImputer(strategy="median")),
-            (
-                "classifier",
-                RandomForestClassifier(
-                    n_estimators=300,
-                    class_weight="balanced",
-                    random_state=42,
-                    min_samples_leaf=2,
-                    n_jobs=-1,
-                ),
-            ),
-        ]
-    )
+    estimator = Pipeline([
+        ("imputer", SimpleImputer(strategy="median")),
+        ("classifier", RandomForestClassifier(
+            n_estimators=300,
+            class_weight="balanced",
+            random_state=42,
+            min_samples_leaf=2,
+            n_jobs=-1,
+        )),
+    ])
     estimator.fit(x_train, y_train)
     class_labels = list(estimator.classes_)
     if 1 not in class_labels:
         raise ValueError("The fitted baseline has no suspicious class")
-    positive_index = class_labels.index(1)
-    probabilities = estimator.predict_proba(x_test)[:, positive_index]
-    predictions = (probabilities >= threshold).astype(int)
+
+    threshold_used = float(threshold)
+    threshold_selection = "configured"
+    if three_way is not None:
+        validation_scores = estimator.predict_proba(x_validation)[:, class_labels.index(1)]
+        threshold_used, validation_metrics = _choose_threshold(
+            y_validation, validation_scores, configured_threshold=threshold
+        )
+        threshold_selection = "validation-f1"
+
+    probabilities = estimator.predict_proba(x_test)[:, class_labels.index(1)]
+    predictions = (probabilities >= threshold_used).astype(int)
     matrix = confusion_matrix(y_test, predictions, labels=[0, 1])
     tn, fp, fn, tp = matrix.ravel()
     report: dict[str, Any] = {
         "model": "RandomForest",
         "split_method": split_method,
-        "threshold": float(threshold),
+        "threshold": threshold_used,
+        "threshold_selection": threshold_selection,
+        "configured_threshold": float(threshold),
         "node_feature_names": NODE_FEATURE_NAMES,
         "train_observations": int(len(y_train)),
+        "validation_observations": int(len(y_validation)) if y_validation is not None else 0,
         "test_observations": int(len(y_test)),
-        "test_class_counts": {"normal": int((y_test == 0).sum()), "suspicious": int((y_test == 1).sum())},
+        "test_class_counts": {
+            "normal": int((y_test == 0).sum()),
+            "suspicious": int((y_test == 1).sum()),
+        },
         "accuracy": float(accuracy_score(y_test, predictions)),
         "precision": float(precision_score(y_test, predictions, zero_division=0)),
         "recall": float(recall_score(y_test, predictions, zero_division=0)),
@@ -130,10 +197,12 @@ def train_baseline(
         "false_positive_rate": float(fp / (fp + tn)) if (fp + tn) else 0.0,
         "false_negative_rate": float(fn / (fn + tp)) if (fn + tp) else 0.0,
         "confusion_matrix_labels_0_1": matrix.tolist(),
+        "validation_metrics": validation_metrics,
         "note": (
-            "For a small number of graph windows, a stratified node-level fallback may split "
-            "nodes from the same snapshot across train and test. Prefer temporal results once "
-            "enough snapshots are collected."
+            "If threshold_selection is configured, the supplied threshold was used. "
+            "If threshold_selection is validation-f1, threshold tuning used a separate "
+            "middle chronological partition and the final metrics use later snapshots. "
+            "A stratified node fallback can mix nodes from the same snapshot across partitions."
         ),
     }
     artifact = Path(model_path)
