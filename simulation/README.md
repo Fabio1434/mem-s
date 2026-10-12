@@ -1,36 +1,35 @@
-# Simulation
+# Simulation — Mininet
 
-This directory contains the reproducible Mininet laboratory.
+The topology creates one Open vSwitch switch (s1), five hosts (h1-h5), OpenFlow 1.3, and a remote Ryu controller at 127.0.0.1:6653.
 
-## Topology
+## Start
 
-`topology.py` creates:
+The repository is designed for Linux or a Linux VM with Mininet, Open vSwitch, and Ryu installed. Create the Python environment with system packages available so the Mininet Python module installed by the operating system remains visible:
 
-- 1 Open vSwitch switch (`s1`)
-- 5 hosts (`h1` ... `h5`)
-- OpenFlow 1.3
-- a remote Ryu controller on `127.0.0.1:6653`
+    python3 -m venv --system-site-packages .venv
+    source .venv/bin/activate
+    pip install -e ".[dev]"
 
-## Run
+Terminal 1:
 
-On a Linux machine with Mininet installed:
+    ryu-manager --ofp-tcp-listen-port 6653 sdn/ryu_app.py
 
-1. Start the Ryu collector from the repository root:
-   `ryu-manager --ofp-tcp-listen-port 6653 sdn/ryu_app.py`
-2. In another terminal, start:
-   `sudo python3 simulation/topology.py`
+Terminal 2:
 
-The script performs `pingAll()` and then opens the Mininet CLI.
+    sudo -E .venv/bin/python simulation/topology.py
 
-## Basic benign traffic
+## Available scenario commands
 
-Inside the Mininet CLI:
+Inside the custom Mininet CLI:
 
-```text
-h1 ping -c 3 h2
-h2 ping -c 3 h3
-h3 ping -c 3 h4
-h4 ping -c 3 h5
-```
+    scenarios
+    scenario normal
+    scenario recon
+    scenario lateral
+    scenario exfil
 
-For the first phase, only benign and controlled traffic should be used. Attack scenarios will be added after the observation pipeline is validated.
+These are bounded, lab-only behaviors. Reconnaissance/lateral cases make TCP connection attempts to the private 10.0.0.0/24 lab hosts without exploit payloads. The exfiltration surrogate transfers only 128 KiB of deterministic dummy bytes to a sink inside the topology.
+
+Each scenario appends a label interval to data/raw/scenario_labels.csv. Ryu samples OpenFlow counters into data/raw/flow_stats.csv. Raw data and annotations stay local and are excluded from source control by .gitignore.
+
+The initial pingAll traffic is not scenario-labeled. Run scenario normal explicitly to create normal labels.
