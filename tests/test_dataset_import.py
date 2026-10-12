@@ -22,15 +22,25 @@ def test_importer_normalizes_timestamped_flow_dataset_and_preserves_labels(tmp_p
             "Flow Duration": 1_000_000, "Total Fwd Packets": 20,
             "Total Length of Fwd Packets": 2000, "Label": "PortScan",
         },
+        {
+            "Timestamp": "2021-08-15 10:00:40",
+            "Source IP": "10.0.0.5", "Destination IP": "10.0.0.6",
+            "Source Port": 45002, "Destination Port": 53, "Protocol": "UDP",
+            "Flow Duration": 500_000, "Total Fwd Packets": 2,
+            "Total Length of Fwd Packets": 120, "Label": "",
+        },
     ]).to_csv(source, index=False)
 
     summary = import_flow_csv(source, target)
     normalized = pd.read_csv(target)
     features = engineer_flow_features(normalized)
 
-    assert summary["rows_imported"] == 2
-    assert normalized["label"].tolist() == [0, 1]
-    assert normalized["ip_proto"].tolist() == [6, 6]
-    assert normalized["duration_sec"].tolist() == [2.0, 1.0]
-    assert features["label"].tolist() == [0, 1]
-    assert features["scenario"].tolist() == ["normal", "portscan"]
+    assert summary["rows_imported"] == 3
+    assert summary["normal_rows"] == 1
+    assert summary["attack_rows"] == 1
+    assert summary["unlabeled_rows"] == 1
+    assert normalized["label"].tolist() == [0, 1, -1]
+    assert normalized["ip_proto"].tolist() == [6, 6, 17]
+    assert normalized["duration_sec"].tolist() == [2.0, 1.0, 0.5]
+    assert features["label"].tolist() == [0, 1, -1]
+    assert features["scenario"].tolist() == ["normal", "portscan", "unlabelled"]
