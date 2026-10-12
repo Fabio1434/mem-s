@@ -16,7 +16,7 @@ This directory contains the reproducible Mininet laboratory.
 On a Linux machine with Mininet installed:
 
 1. Start the Ryu collector from the repository root:
-   `ryu-manager sdn/ryu_app.py`
+   `ryu-manager --ofp-tcp-listen-port 6653 sdn/ryu_app.py`
 2. In another terminal, start:
    `sudo python3 simulation/topology.py`
 
