@@ -15,6 +15,8 @@ NODE_FEATURE_NAMES = [
     "out_flows", "in_flows", "unique_destinations", "unique_sources",
     "unique_destination_ports", "packets_out", "packets_in", "bytes_out", "bytes_in",
     "packet_rate_out_mean", "byte_rate_out_mean", "duration_out_mean",
+    "active_previous_window", "out_flows_delta", "new_destinations_this_window",
+    "active_window_streak",
 ]
 
 LABEL_COLUMNS = ["timestamp_start", "timestamp_end", "src_ip", "dst_ip", "label", "scenario"]
