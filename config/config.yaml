@@ -1,0 +1,22 @@
+project:
+  name: gnn-sdn-apt-detection
+  mode: research
+
+graph:
+  directed: true
+  temporal_window_seconds: 10
+
+detection:
+  model: gcn
+  threshold: 0.90
+
+mitigation:
+  enabled: false
+  default_action: alert
+
+sdn:
+  controller: ryu
+  openflow_version: "1.3"
+
+logging:
+  level: INFO
