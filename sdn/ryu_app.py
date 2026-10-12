@@ -59,7 +59,10 @@ class FlowStatsCollector(app_manager.RyuApp):
         self.mitigation_enabled, self.block_timeout_seconds = _mitigation_settings()
         self._ensure_output()
         if self.mitigation_enabled:
-            self.logger.warning(\n                "Lab mitigation is ENABLED; IPv4 blocks expire after %d seconds",\n                self.block_timeout_seconds,\n            )
+            self.logger.warning(
+                "Lab mitigation is ENABLED; IPv4 blocks expire after %d seconds",
+                self.block_timeout_seconds,
+            )
         else:
             self.logger.info("Observation/alert mode; automatic mitigation is disabled")
         self.monitor_thread = hub.spawn(self._monitor)
