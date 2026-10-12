@@ -20,7 +20,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "mitigation_events": "data/processed/mitigation_events.jsonl",
     },
     "graph": {"directed": True, "temporal_window_seconds": 10},
-    "detection": {"model": "baseline", "threshold": 0.9},
+    "detection": {"model": "baseline", "threshold": 0.9, "use_model_threshold": True},
     "mitigation": {"enabled": False, "default_action": "alert"},
     "sdn": {"controller": "ryu", "openflow_version": "1.3"},
     "logging": {"level": "INFO"},
