@@ -27,11 +27,16 @@ def _to_data(graph: dict[str, Any]) -> Data:
     y = torch.tensor(
         [int(node.get("label", -1)) for node in graph["nodes"]], dtype=torch.long
     )
-    edges = [
-        [index[edge["source"]], index[edge["target"]]]
-        for edge in graph.get("edges", [])
-        if edge.get("source") in index and edge.get("target") in index
-    ]
+    # The graph stores directed flows, while GCN/GAT message passing uses
+    # both directions so source-host embeddings can aggregate neighbor context.
+    edge_pairs: set[tuple[int, int]] = set()
+    for edge in graph.get("edges", []):
+        source, target = edge.get("source"), edge.get("target")
+        if source in index and target in index:
+            src_index, dst_index = index[source], index[target]
+            edge_pairs.add((src_index, dst_index))
+            edge_pairs.add((dst_index, src_index))
+    edges = sorted(edge_pairs)
     edge_index = (
         torch.tensor(edges, dtype=torch.long).t().contiguous()
         if edges else torch.empty((2, 0), dtype=torch.long)
