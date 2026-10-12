@@ -37,9 +37,9 @@ Les compteurs négatifs ou remis à zéro sont traités comme un reset de règle
 
 Chaque ligne représente une fenêtre :
 - timestamp et window_id ;
-- nodes : IP, vecteur de 12 caractéristiques, label et nombre de labels ;
+- nodes : IP, vecteur de 16 caractéristiques, label et nombre de labels ;
 - edges : source, cible, vecteur agrégé de 5 caractéristiques, label et nombre d'observations.
 
-Les caractéristiques des nœuds agrègent les communications entrantes et sortantes : nombre de flux, nombre de sources/destinations/ports distincts, volumes, taux moyens et durée moyenne.
+Les 12 premières caractéristiques agrègent les communications entrantes et sortantes : nombre de flux, nombre de sources/destinations/ports distincts, volumes, taux moyens et durée moyenne. Les quatre dernières encodent le contexte temporel : activité à la fenêtre précédente, variation du nombre de flux sortants, nouvelles destinations et longueur de la série d'activité. L'historique court est réinitialisé lorsqu'une ou plusieurs fenêtres sans observations séparent deux snapshots.
 
 L'ordre des caractéristiques est figé dans src/gnn_sdn_apt/schema.py. Toute modification du schéma doit entraîner une réévaluation des modèles et de la compatibilité des artefacts.
