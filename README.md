@@ -46,6 +46,19 @@ Dans la CLI Mininet :
 
 Ces scénarios restent confinés aux hôtes privés 10.0.0.0/24. Les tentatives TCP sont bornées et n'exécutent pas d'exploits. Le transfert de données utilise des octets factices vers un récepteur dans la topologie.
 
+## Smoke test hors Mininet
+
+Pour vérifier tout le pipeline sans attendre d'avoir accès à une VM SDN, le dépôt fournit un captureur synthétique marqué comme tel :
+
+    python scripts/run_demo.py --output-dir data/demo
+
+Cette commande génère une capture fictive et ses annotations, prépare les features et les graphes temporels, entraîne la baseline Random Forest et écrit les rapports dans data/demo/reports/. Pour inclure aussi GCN et GAT :
+
+    pip install -e ".[ml]"
+    python scripts/run_demo.py --output-dir data/demo --with-gnn --epochs 3
+
+**Important :** les métriques de ce smoke test servent uniquement à vérifier le fonctionnement du logiciel. Elles ne représentent pas la performance du détecteur sur de vraies attaques ou des APT. Pour l'évaluation du mémoire, utiliser des données collectées et annotées dans le labo ou un dataset public adapté.
+
 ## Importer un dataset public horodaté
 
 L'importeur générique convertit notamment des CSV de type CICFlowMeter/UNSW vers le schéma du projet. Les labels de catégorie d'attaque deviennent « normal vs attaque » et ne doivent pas être décrits comme des labels APT spécifiques.
