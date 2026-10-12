@@ -45,6 +45,13 @@ def main() -> None:
     inspect = commands.add_parser("inspect", help="show graph dataset and label counts")
     inspect.add_argument("--graphs", default=None)
 
+    compare = commands.add_parser("compare", help="combine saved model metrics into one CSV")
+    compare.add_argument("--reports-dir", default=None)
+    compare.add_argument("--output", default=None)
+
+    mitigation = commands.add_parser("summarize-mitigation", help="summarize Ryu decision-action timings")
+    mitigation.add_argument("--events", default=None)
+
     args = parser.parse_args()
     config = load_config(args.config)
     paths = config["paths"]
@@ -74,6 +81,17 @@ def main() -> None:
                 threshold=args.threshold if args.threshold is not None else float(config["detection"]["threshold"]),
             )
         )
+    elif args.command == "compare":
+        from .evaluation import compare_model_reports
+
+        reports_dir = args.reports_dir or paths["reports"]
+        output_path = args.output or str(Path(reports_dir) / "model_comparison.csv")
+        _print_json(compare_model_reports(reports_dir, output_path))
+    elif args.command == "summarize-mitigation":
+        from .evaluation import summarize_mitigation_events
+
+        events_path = args.events or paths.get("mitigation_events", "data/processed/mitigation_events.jsonl")
+        _print_json(summarize_mitigation_events(events_path))
     elif args.command == "inspect":
         graph_path = args.graphs or paths["graphs"]
         graphs = read_graphs(graph_path)
