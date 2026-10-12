@@ -12,10 +12,12 @@ env/
 htmlcov/
 .ipynb_checkpoints/
 data/raw/*
+data/demo/*
 data/processed/*
 models/checkpoints/*
 reports/*
 !data/raw/.gitkeep
+!data/demo/.gitkeep
 !data/processed/.gitkeep
 !models/checkpoints/.gitkeep
 !reports/.gitkeep
