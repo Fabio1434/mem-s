@@ -238,6 +238,8 @@ def train_gnn(
         "feature_names": NODE_FEATURE_NAMES,
         "scaler_mean": scaler.mean_.tolist(),
         "scaler_scale": scaler.scale_.tolist(),
+        "threshold": threshold_used,
+        "threshold_selection": threshold_selection,
         "state_dict": model.state_dict(),
     }, artifact)
     report_file = Path(report_path)
