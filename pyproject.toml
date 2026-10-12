@@ -23,6 +23,7 @@ dev = ["pytest>=7.4", "ruff>=0.4"]
 
 [project.scripts]
 gnn-sdn-apt = "gnn_sdn_apt.cli:main"
+gnn-sdn-apt-live = "gnn_sdn_apt.live:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
