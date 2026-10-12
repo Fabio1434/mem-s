@@ -21,6 +21,8 @@ detection:
   # Train the classical baseline first; switch to gcn or gat after the GNN is trained.
   model: baseline
   threshold: 0.90
+  # If enabled, inference prefers the model artifact threshold (including temporal calibration).
+  use_model_threshold: true
 
 mitigation:
   # Keep false until detection has been experimentally evaluated.
