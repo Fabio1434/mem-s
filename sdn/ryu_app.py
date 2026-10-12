@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ryu application for OpenFlow 1.3 discovery and flow statistics.
+"""Ryu application for OpenFlow 1.3 observation and flow statistics.
 
 The application is intentionally limited to observation in this phase.
 No automatic blocking or quarantine is performed.
@@ -10,7 +10,12 @@ import time
 
 from ryu.base import app_manager
 from ryu.controller import ofp_event
-from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
+from ryu.controller.handler import (
+    CONFIG_DISPATCHER,
+    DEAD_DISPATCHER,
+    MAIN_DISPATCHER,
+    set_ev_cls,
+)
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib import hub
 
@@ -56,14 +61,53 @@ class FlowStatsCollector(app_manager.RyuApp):
                     ]
                 )
 
-    @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, CONFIG_DISPATCHER])
+    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
+    def _switch_features_handler(self, ev):
+        """Install a table-miss rule that sends unknown packets to the controller."""
+        datapath = ev.msg.datapath
+        parser = datapath.ofproto_parser
+        ofproto = datapath.ofproto
+
+        actions = [
+            parser.OFPActionOutput(
+                ofproto.OFPP_CONTROLLER,
+                ofproto.OFPCML_NO_BUFFER,
+            )
+        ]
+        match = parser.OFPMatch()
+        self._add_flow(datapath, priority=0, match=match, actions=actions)
+
+        self.logger.info("Installed table-miss rule: dpid=%s", datapath.id)
+
+    @staticmethod
+    def _add_flow(datapath, priority, match, actions):
+        parser = datapath.ofproto_parser
+        ofproto = datapath.ofproto
+
+        instructions = [
+            parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)
+        ]
+        modification = parser.OFPFlowMod(
+            datapath=datapath,
+            priority=priority,
+            match=match,
+            instructions=instructions,
+        )
+        datapath.send_msg(modification)
+
+    @set_ev_cls(
+        ofp_event.EventOFPStateChange,
+        [MAIN_DISPATCHER, DEAD_DISPATCHER],
+    )
     def _state_change_handler(self, ev):
         datapath = ev.datapath
+
         if ev.state == MAIN_DISPATCHER:
             self.datapaths[datapath.id] = datapath
             self.logger.info("Switch connected: dpid=%s", datapath.id)
-        else:
+        elif ev.state == DEAD_DISPATCHER:
             self.datapaths.pop(datapath.id, None)
+            self.logger.info("Switch disconnected: dpid=%s", datapath.id)
 
     def _monitor(self):
         while True:
