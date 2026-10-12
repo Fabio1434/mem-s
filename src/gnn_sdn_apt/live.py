@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import load_config
+from .decision import decide_action
 from .graph.builder import build_graph_snapshots
 from .graph.io import write_graphs
 from .inference import score_baseline_nodes, score_gnn_nodes
@@ -92,11 +93,15 @@ def run_once(
         if now - _LAST_EMITTED.get(key, 0.0) < cooldown:
             continue
         _LAST_EMITTED[key] = now
+        policy = decide_action(
+            item["source_ip"],
+            item["score"],
+            threshold=threshold,
+            mitigation_enabled=mitigation_enabled,
+        )
         record = {
             **item,
-            "threshold": threshold,
-            "suspicious": True,
-            "action": "block_source" if mitigation_enabled else "alert",
+            **policy,
             "model": model_name,
             "mitigation_enabled": mitigation_enabled,
             "created_at": now,
