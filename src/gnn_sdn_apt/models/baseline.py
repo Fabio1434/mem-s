@@ -69,8 +69,11 @@ def train_baseline(
     graphs_path: str | Path,
     model_path: str | Path,
     report_path: str | Path,
+    threshold: float = 0.9,
 ) -> dict[str, Any]:
     """Train a Random Forest and store model plus a metrics JSON report."""
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError("threshold must be in the [0, 1] interval")
     graphs = read_graphs(graphs_path)
     x, y, times = _node_table(graphs)
     if len(y) < 8:
@@ -104,12 +107,18 @@ def train_baseline(
         ]
     )
     estimator.fit(x_train, y_train)
-    predictions = estimator.predict(x_test)
+    class_labels = list(estimator.classes_)
+    if 1 not in class_labels:
+        raise ValueError("The fitted baseline has no suspicious class")
+    positive_index = class_labels.index(1)
+    probabilities = estimator.predict_proba(x_test)[:, positive_index]
+    predictions = (probabilities >= threshold).astype(int)
     matrix = confusion_matrix(y_test, predictions, labels=[0, 1])
     tn, fp, fn, tp = matrix.ravel()
     report: dict[str, Any] = {
         "model": "RandomForest",
         "split_method": split_method,
+        "threshold": float(threshold),
         "node_feature_names": NODE_FEATURE_NAMES,
         "train_observations": int(len(y_train)),
         "test_observations": int(len(y_test)),
