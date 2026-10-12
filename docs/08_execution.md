@@ -72,7 +72,7 @@ Une observation sans annotation correspond au label -1, pas à une observation n
 
 ## 4. Entraîner la baseline classique
 
-    gnn-sdn-apt train-baseline
+    gnn-sdn-apt train-baseline --calibrate-threshold
     gnn-sdn-apt inspect
 
 Artefacts :
@@ -86,12 +86,12 @@ La baseline Random Forest est la référence de comparaison. Le rapport indique 
 Après la baseline, installer l'extra ML et collecter suffisamment de graphes annotés dans plusieurs fenêtres temporelles :
 
     pip install -e ".[ml]"
-    gnn-sdn-apt train-gnn --model gcn --epochs 100
-    gnn-sdn-apt train-gnn --model gat --epochs 100
+    gnn-sdn-apt train-gnn --model gcn --epochs 100 --calibrate-threshold
+    gnn-sdn-apt train-gnn --model gat --epochs 100 --calibrate-threshold
 
 Artefacts : modèles .pt et rapports JSON correspondants dans models/checkpoints et reports.
 
-L'entraînement GNN utilise un découpage chronologique par snapshots. Il échoue explicitement si les partitions ne contiennent pas les deux classes ou si le nombre de snapshots annotés est insuffisant.
+L'entraînement GNN utilise un découpage chronologique par snapshots. Avec --calibrate-threshold et au moins six snapshots utilisables, les snapshots les plus anciens servent à l'entraînement, les suivants à la calibration du seuil et les plus récents au test final. Chaque partition doit contenir les deux classes. Si les données ne permettent pas un tel découpage, le code revient à un seuil fixe configuré et le rapport le signale.
 
 ## 6. Inférence en quasi-temps réel
 
