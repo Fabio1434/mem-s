@@ -18,7 +18,7 @@ from .config import load_config
 from .decision import decide_action
 from .graph.builder import build_graph_snapshots
 from .graph.io import write_graphs
-from .inference import score_baseline_nodes, score_gnn_nodes
+from .inference import load_saved_threshold, score_baseline_nodes, score_gnn_nodes
 from .features import prepare_flow_file
 
 LOGGER = logging.getLogger("gnn_sdn_apt.live")
@@ -78,7 +78,11 @@ def run_once(
     else:
         raise ValueError("model must be baseline, gcn, or gat")
 
-    threshold = float(config["detection"].get("threshold", 0.9))
+    configured_threshold = float(config["detection"].get("threshold", 0.9))
+    if bool(config["detection"].get("use_model_threshold", True)):
+        threshold = load_saved_threshold(model_name, artifact, fallback=configured_threshold)
+    else:
+        threshold = configured_threshold
     mitigation_enabled = (
         bool(config.get("mitigation", {}).get("enabled", False))
         and os.getenv("GNN_SDN_MITIGATION", "0") == "1"
