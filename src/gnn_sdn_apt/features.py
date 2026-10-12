@@ -52,6 +52,16 @@ def engineer_flow_features(
         )
 
     frame = raw.copy()
+    existing_labels = (
+        pd.to_numeric(frame["label"], errors="coerce")
+        if "label" in frame.columns
+        else pd.Series([-1] * len(frame), index=frame.index, dtype=float)
+    )
+    existing_scenarios = (
+        frame["scenario"].fillna("unlabeled").astype(str)
+        if "scenario" in frame.columns
+        else pd.Series(["unlabeled"] * len(frame), index=frame.index)
+    )
     for column in RAW_COLUMNS:
         if column not in frame.columns:
             frame[column] = np.nan
@@ -107,16 +117,26 @@ def engineer_flow_features(
         if annotations_path is not None
         else pd.DataFrame()
     )
-    if annotations.empty:
-        frame["label"] = -1
-        frame["scenario"] = "unlabelled"
-    else:
-        labels = [
-            label_flow(float(row.timestamp), str(row.ip_src), str(row.ip_dst), annotations)
-            for row in frame.itertuples(index=False)
-        ]
-        frame["label"] = [item[0] for item in labels]
-        frame["scenario"] = [item[1] for item in labels]
+    labels = [
+        label_flow(float(row.timestamp), str(row.ip_src), str(row.ip_dst), annotations)
+        for row in frame.itertuples(index=False)
+    ] if not annotations.empty else [(-1, "unlabeled")] * len(frame)
+
+    merged_labels = []
+    merged_scenarios = []
+    for index, (annotation_label, annotation_scenario) in enumerate(labels):
+        original_label = existing_labels.iloc[index]
+        if annotation_label in (0, 1):
+            merged_labels.append(int(annotation_label))
+            merged_scenarios.append(annotation_scenario)
+        elif pd.notna(original_label) and int(original_label) in (0, 1):
+            merged_labels.append(int(original_label))
+            merged_scenarios.append(str(existing_scenarios.iloc[index]))
+        else:
+            merged_labels.append(-1)
+            merged_scenarios.append("unlabelled")
+    frame["label"] = merged_labels
+    frame["scenario"] = merged_scenarios
 
     frame = frame.replace([np.inf, -np.inf], np.nan)
     for column in FLOW_FEATURE_COLUMNS:
