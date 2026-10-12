@@ -32,15 +32,18 @@ Alert / Block / Isolate
 
 Un nœud représente une entité réseau observable, principalement un hôte.
 
-Caractéristiques envisagées :
+Caractéristiques envisagées et partiellement implémentées :
 
-- nombre de connexions
-- nombre de destinations
-- nombre de ports utilisés
-- octets entrants et sortants
-- paquets entrants et sortants
-- connexions échouées
-- fréquence des connexions
+- nombre de flux entrants et sortants ;
+- nombre de destinations, sources et ports distincts ;
+- volumes de paquets/octets et taux moyens ;
+- durée moyenne des flux ;
+- activité à la fenêtre précédente ;
+- variation du nombre de flux sortants ;
+- nombre de nouvelles destinations dans la fenêtre ;
+- longueur de la séquence d'activité consécutive.
+
+Les features temporelles d'un nœud sont calculées à partir de la fenêtre précédente observée. Après une lacune de fenêtre, l'historique court est réinitialisé. Il s'agit d'une classification GNN par snapshot avec features temporelles explicites, pas d'une architecture récurrente temporelle.
 
 ### Arêtes
 
