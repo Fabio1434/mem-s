@@ -37,8 +37,8 @@ def label_flow(
     eligible = annotations[
         (annotations["timestamp_start"] <= timestamp)
         & (annotations["timestamp_end"] >= timestamp)
-    ]
-    eligible = eligible.sort_values("timestamp_start", ascending=False)\n    for row in eligible.itertuples(index=False):
+    ].sort_values("timestamp_start", ascending=False)
+    for row in eligible.itertuples(index=False):
         expected_src = str(row.src_ip).strip()
         expected_dst = str(row.dst_ip).strip()
         if expected_src and expected_src.lower() != "nan" and expected_src != src_ip:
@@ -66,6 +66,10 @@ def append_annotation(
     annotation_path.parent.mkdir(parents=True, exist_ok=True)
     exists = annotation_path.exists() and annotation_path.stat().st_size > 0
     pd.DataFrame([{
-        "timestamp_start": float(start), "timestamp_end": float(end),
-        "src_ip": src_ip, "dst_ip": dst_ip, "label": label, "scenario": scenario,
+        "timestamp_start": float(start),
+        "timestamp_end": float(end),
+        "src_ip": src_ip,
+        "dst_ip": dst_ip,
+        "label": label,
+        "scenario": scenario,
     }]).to_csv(annotation_path, mode="a", header=not exists, index=False)
