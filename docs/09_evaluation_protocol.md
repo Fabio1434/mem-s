@@ -20,7 +20,7 @@ Ces hypothèses doivent être confirmées par les résultats ; aucune supériori
 5. Construire le dataset et figer une version des données utilisée pour l'expérience.
 6. Entraîner Random Forest comme baseline.
 7. Entraîner GCN puis GAT avec un découpage chronologique par snapshots.
-8. Choisir le seuil sur un jeu de validation séparé ; ne pas choisir le seuil en regardant le test final.
+8. Si le nombre et la distribution des snapshots le permettent, sélectionner le seuil sur une partition chronologique de validation avec --calibrate-threshold ; ne pas choisir le seuil en regardant le test final. Vérifier threshold_selection dans le rapport.
 9. Comparer les métriques sur le même périmètre d'évaluation.
 10. Répéter les scénarios et enregistrer les délais de détection et de réponse SDN.
 
