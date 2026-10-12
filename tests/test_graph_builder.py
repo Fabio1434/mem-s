@@ -31,3 +31,31 @@ def test_graph_builder_skips_rows_without_ip_endpoints():
         {"timestamp": 100, "ip_src": "", "ip_dst": "", "label": -1}
     ]), window_seconds=10)
     assert graphs == []
+
+
+def test_temporal_features_track_new_destinations_and_activity_streak():
+    rows = []
+    for timestamp, destination, destination_port in [
+        (100.0, "10.0.0.2", 80),
+        (110.0, "10.0.0.3", 443),
+    ]:
+        row = {
+            "timestamp": timestamp, "ip_src": "10.0.0.1", "ip_dst": destination,
+            "label": 1, "scenario": "recon", "dst_port_num": destination_port,
+        }
+        row.update({name: 0.0 for name in FLOW_FEATURE_COLUMNS})
+        row.update({
+            "packets_delta": 3.0, "bytes_delta": 300.0,
+            "packet_rate": 0.6, "byte_rate": 60.0,
+            "duration_sec": 2.0, "dst_port_num": float(destination_port),
+        })
+        rows.append(row)
+
+    graphs = build_graph_snapshots(pd.DataFrame(rows), window_seconds=10)
+    assert len(graphs) == 2
+    node = next(item for item in graphs[1]["nodes"] if item["id"] == "10.0.0.1")
+    features = node["features"]
+    assert features[12] == 1.0  # active in previous window
+    assert features[13] == 0.0  # same outgoing-flow count
+    assert features[14] == 1.0  # new destination
+    assert features[15] == 2.0  # consecutive active windows
