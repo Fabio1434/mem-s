@@ -30,6 +30,6 @@ Inside the custom Mininet CLI:
 
 These are bounded, lab-only behaviors. Reconnaissance/lateral cases make TCP connection attempts to the private 10.0.0.0/24 lab hosts without exploit payloads. The exfiltration surrogate transfers only 128 KiB of deterministic dummy bytes to a sink inside the topology.
 
-Each scenario appends a label interval to data/raw/scenario_labels.csv. Ryu samples OpenFlow counters into data/raw/flow_stats.csv. Raw data and annotations stay local and are excluded from source control by .gitignore.
+Each scenario appends a label interval to data/raw/scenario_labels.csv. Wait at least 10 seconds between scenario commands to reduce label-window overlap. Ryu samples OpenFlow counters into data/raw/flow_stats.csv. Raw data and annotations stay local and are excluded from source control by .gitignore.
 
 The initial pingAll traffic is not scenario-labeled. Run scenario normal explicitly to create normal labels.
