@@ -108,10 +108,23 @@ def engineer_flow_features(
 
     frame["packets_delta"] = frame["packets_delta"].fillna(0).clip(lower=0)
     frame["bytes_delta"] = frame["bytes_delta"].fillna(0).clip(lower=0)
+
+    # Public IDS exports contain independent completed-flow records, not
+    # cumulative counters. Never subtract a prior row from such a record,
+    # even when the same five-tuple appears more than once in the CSV.
+    flow_record_mask = frame["_record_mode"].eq("flow_record")
+    frame.loc[flow_record_mask, "packets_delta"] = frame.loc[
+        flow_record_mask, "packet_count"
+    ]
+    frame.loc[flow_record_mask, "bytes_delta"] = frame.loc[
+        flow_record_mask, "byte_count"
+    ]
+
     frame["packet_rate"] = frame["packets_delta"] / frame["poll_seconds"]
     frame["byte_rate"] = frame["bytes_delta"] / frame["poll_seconds"]
 
     frame["duration_sec"] = pd.to_numeric(frame["duration_sec"], errors="coerce").fillna(0)
+    flow_record_with_duration = flow_record_mask & (frame["duration_sec"] > 0)
     frame["ip_proto_num"] = pd.to_numeric(frame["ip_proto"], errors="coerce").fillna(-1)
     frame["src_port_num"] = pd.to_numeric(frame["src_port"], errors="coerce").fillna(-1)
     frame["dst_port_num"] = pd.to_numeric(frame["dst_port"], errors="coerce").fillna(-1)
@@ -119,13 +132,15 @@ def engineer_flow_features(
 
     # Public IDS CSVs store one completed flow per row rather than cumulative
     # switch counters. In that mode, use each flow duration for rates.
-    flow_record_mask = frame["_record_mode"].eq("flow_record") & (frame["duration_sec"] > 0)
-    frame.loc[flow_record_mask, "packet_rate"] = (
-        frame.loc[flow_record_mask, "packets_delta"] / frame.loc[flow_record_mask, "duration_sec"]
+    frame.loc[flow_record_with_duration, "packet_rate"] = (
+        frame.loc[flow_record_with_duration, "packets_delta"]
+        / frame.loc[flow_record_with_duration, "duration_sec"]
     )
-    frame.loc[flow_record_mask, "byte_rate"] = (
-        frame.loc[flow_record_mask, "bytes_delta"] / frame.loc[flow_record_mask, "duration_sec"]
+    frame.loc[flow_record_with_duration, "byte_rate"] = (
+        frame.loc[flow_record_with_duration, "bytes_delta"]
+        / frame.loc[flow_record_with_duration, "duration_sec"]
     )
+    frame.loc[flow_record_mask & ~flow_record_with_duration, ["packet_rate", "byte_rate"]] = 0.0
 
     annotations = (
         load_annotations(annotations_path)
