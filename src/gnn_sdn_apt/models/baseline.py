@@ -208,7 +208,15 @@ def train_baseline(
     }
     artifact = Path(model_path)
     artifact.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({\n        "estimator": estimator,\n        "feature_names": NODE_FEATURE_NAMES,\n        "threshold": threshold_used,\n        "threshold_selection": threshold_selection,\n    }, artifact)
+    joblib.dump(
+        {
+            "estimator": estimator,
+            "feature_names": NODE_FEATURE_NAMES,
+            "threshold": threshold_used,
+            "threshold_selection": threshold_selection,
+        },
+        artifact,
+    )
     report_file = Path(report_path)
     report_file.parent.mkdir(parents=True, exist_ok=True)
     report_file.write_text(json.dumps(report, indent=2), encoding="utf-8")
