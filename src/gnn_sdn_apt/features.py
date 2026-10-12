@@ -52,15 +52,15 @@ def engineer_flow_features(
         )
 
     frame = raw.copy()
-    existing_labels = (
+    frame["_existing_label"] = (
         pd.to_numeric(frame["label"], errors="coerce")
         if "label" in frame.columns
-        else pd.Series([-1] * len(frame), index=frame.index, dtype=float)
+        else -1
     )
-    existing_scenarios = (
+    frame["_existing_scenario"] = (
         frame["scenario"].fillna("unlabeled").astype(str)
         if "scenario" in frame.columns
-        else pd.Series(["unlabeled"] * len(frame), index=frame.index)
+        else "unlabeled"
     )
     for column in RAW_COLUMNS:
         if column not in frame.columns:
@@ -125,18 +125,19 @@ def engineer_flow_features(
     merged_labels = []
     merged_scenarios = []
     for index, (annotation_label, annotation_scenario) in enumerate(labels):
-        original_label = existing_labels.iloc[index]
+        original_label = frame["_existing_label"].iloc[index]
         if annotation_label in (0, 1):
             merged_labels.append(int(annotation_label))
             merged_scenarios.append(annotation_scenario)
         elif pd.notna(original_label) and int(original_label) in (0, 1):
             merged_labels.append(int(original_label))
-            merged_scenarios.append(str(existing_scenarios.iloc[index]))
+            merged_scenarios.append(str(frame["_existing_scenario"].iloc[index]))
         else:
             merged_labels.append(-1)
             merged_scenarios.append("unlabelled")
     frame["label"] = merged_labels
     frame["scenario"] = merged_scenarios
+    frame = frame.drop(columns=["_existing_label", "_existing_scenario"])
 
     frame = frame.replace([np.inf, -np.inf], np.nan)
     for column in FLOW_FEATURE_COLUMNS:
