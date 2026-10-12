@@ -49,7 +49,8 @@ class FlowStatsCollector(app_manager.RyuApp):
         super().__init__(*args, **kwargs)
         self.datapaths = {}
         self.mac_to_port = {}
-        self.decision_offset = 0
+        # Ignore stale decisions from previous runs; consume only newly appended rows.
+        self.decision_offset = os.path.getsize(DECISIONS) if os.path.exists(DECISIONS) else 0
         self.mitigation_enabled = _mitigation_enabled()
         self._ensure_output()
         if self.mitigation_enabled:
