@@ -17,6 +17,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "reports": "reports",
         "alerts": "data/processed/alerts.jsonl",
         "decisions": "data/processed/decisions.jsonl",
+        "mitigation_events": "data/processed/mitigation_events.jsonl",
     },
     "graph": {"directed": True, "temporal_window_seconds": 10},
     "detection": {"model": "baseline", "threshold": 0.9},
