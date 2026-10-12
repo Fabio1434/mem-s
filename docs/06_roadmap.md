@@ -9,12 +9,13 @@
 - [ ] Valider les choix avec l'encadrement
 
 ## Phase 2 — SDN
-- [ ] Préparer l'environnement Linux
+- [x] Préparer le squelette du laboratoire Linux
 - [ ] Installer Mininet
 - [ ] Installer Ryu
-- [ ] Créer la topologie
-- [ ] Vérifier OpenFlow
-- [ ] Collecter les statistiques
+- [x] Créer la topologie
+- [x] Préparer OpenFlow 1.3
+- [x] Implémenter la collecte des statistiques
+- [ ] Valider la connectivité et les flux sur une machine Linux
 
 ## Phase 3 — Data pipeline
 - [ ] Définir le schéma
