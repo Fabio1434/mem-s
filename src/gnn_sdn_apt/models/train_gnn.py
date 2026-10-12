@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import torch
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
 from torch_geometric.data import Data
@@ -23,9 +22,7 @@ def _to_data(graph: dict[str, Any]) -> Data:
             edge_index=torch.empty((2, 0), dtype=torch.long),
             y=torch.empty((0,), dtype=torch.long),
         )
-    x = torch.tensor(
-        [node["features"] for node in graph["nodes"]], dtype=torch.float32
-    )
+    x = torch.tensor([node["features"] for node in graph["nodes"]], dtype=torch.float32)
     y = torch.tensor(
         [int(node.get("label", -1)) for node in graph["nodes"]], dtype=torch.long
     )
@@ -49,10 +46,13 @@ def train_gnn(
     epochs: int = 100,
     learning_rate: float = 0.005,
     hidden_dim: int = 32,
+    threshold: float = 0.9,
 ) -> dict[str, Any]:
-    """Train on earlier snapshots and evaluate on later snapshots."""
+    """Train on earlier snapshots and evaluate on later snapshots at a fixed threshold."""
     if epochs < 1:
         raise ValueError("epochs must be positive")
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError("threshold must be in the [0, 1] interval")
     graphs = read_graphs(graphs_path)
     graphs = sorted(graphs, key=lambda graph: float(graph.get("timestamp", 0)))
     datasets = [_to_data(graph) for graph in graphs]
@@ -99,9 +99,9 @@ def train_gnn(
             mask = data.y >= 0
             if not bool(mask.any()):
                 continue
-            scores = model(data.x, data.edge_index)
+            scores = torch.softmax(model(data.x, data.edge_index), dim=1)[:, 1]
             truth.extend(data.y[mask].tolist())
-            predicted.extend(scores[mask].argmax(dim=1).tolist())
+            predicted.extend((scores[mask] >= threshold).to(torch.long).tolist())
 
     if not truth:
         raise ValueError("The temporal test partition contains no labeled nodes.")
@@ -114,6 +114,7 @@ def train_gnn(
         "train_graph_snapshots": len(train_graphs),
         "test_graph_snapshots": len(test_graphs),
         "epochs": epochs,
+        "threshold": float(threshold),
         "node_feature_names": NODE_FEATURE_NAMES,
         "test_observations": len(truth),
         "accuracy": float(accuracy_score(truth, predicted)),
