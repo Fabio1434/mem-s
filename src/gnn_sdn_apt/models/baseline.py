@@ -68,11 +68,12 @@ def _temporal_split(
     x: np.ndarray,
     y: np.ndarray,
     times: np.ndarray,
-    test_size: float = 0.25,
+    test_size: float = 0.3,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, str]:
     unique_times = np.unique(times)
     if len(unique_times) >= 4:
-        cutoff = unique_times[max(1, int(len(unique_times) * (1 - test_size)) - 1)]
+        cutoff_index = min(max(1, int(len(unique_times) * (1 - test_size))), len(unique_times) - 1)
+        cutoff = unique_times[cutoff_index]
         train_mask = times < cutoff
         test_mask = times >= cutoff
         if (
