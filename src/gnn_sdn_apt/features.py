@@ -57,6 +57,11 @@ def engineer_flow_features(
         if "label" in frame.columns
         else -1
     )
+    frame["_record_mode"] = (
+        frame["record_mode"].fillna("counter").astype(str)
+        if "record_mode" in frame.columns
+        else "counter"
+    )
     frame["_existing_scenario"] = (
         frame["scenario"].fillna("unlabeled").astype(str)
         if "scenario" in frame.columns
@@ -112,6 +117,16 @@ def engineer_flow_features(
     frame["dst_port_num"] = pd.to_numeric(frame["dst_port"], errors="coerce").fillna(-1)
     frame["in_port_num"] = pd.to_numeric(frame["in_port"], errors="coerce").fillna(-1)
 
+    # Public IDS CSVs store one completed flow per row rather than cumulative
+    # switch counters. In that mode, use each flow duration for rates.
+    flow_record_mask = frame["_record_mode"].eq("flow_record") & (frame["duration_sec"] > 0)
+    frame.loc[flow_record_mask, "packet_rate"] = (
+        frame.loc[flow_record_mask, "packets_delta"] / frame.loc[flow_record_mask, "duration_sec"]
+    )
+    frame.loc[flow_record_mask, "byte_rate"] = (
+        frame.loc[flow_record_mask, "bytes_delta"] / frame.loc[flow_record_mask, "duration_sec"]
+    )
+
     annotations = (
         load_annotations(annotations_path)
         if annotations_path is not None
@@ -137,7 +152,7 @@ def engineer_flow_features(
             merged_scenarios.append("unlabelled")
     frame["label"] = merged_labels
     frame["scenario"] = merged_scenarios
-    frame = frame.drop(columns=["_existing_label", "_existing_scenario"])
+    frame = frame.drop(columns=["_existing_label", "_existing_scenario", "_record_mode"])
 
     frame = frame.replace([np.inf, -np.inf], np.nan)
     for column in FLOW_FEATURE_COLUMNS:
