@@ -7,6 +7,7 @@ from typing import Any
 
 import torch
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
+from sklearn.preprocessing import StandardScaler
 from torch_geometric.data import Data
 
 from ..graph.io import read_graphs
@@ -75,6 +76,13 @@ def train_gnn(
             "Collect more normal and suspicious windows before training."
         )
 
+    # Fit feature normalization on training snapshots only to avoid temporal leakage.
+    scaler = StandardScaler()
+    train_matrix = torch.cat([graph.x for graph in train_graphs], dim=0).numpy()
+    scaler.fit(train_matrix)
+    for data in datasets:
+        data.x = torch.tensor(scaler.transform(data.x.numpy()), dtype=torch.float32)
+
     model = create_model(model_name, input_dim=len(NODE_FEATURE_NAMES), hidden_dim=hidden_dim)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=5e-4)
     loss_fn = torch.nn.CrossEntropyLoss()
@@ -132,6 +140,9 @@ def train_gnn(
         "model_name": model_name.lower(),
         "feature_dim": len(NODE_FEATURE_NAMES),
         "hidden_dim": hidden_dim,
+        "feature_names": NODE_FEATURE_NAMES,
+        "scaler_mean": scaler.mean_.tolist(),
+        "scaler_scale": scaler.scale_.tolist(),
         "state_dict": model.state_dict(),
     }, artifact)
     report_file = Path(report_path)
