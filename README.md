@@ -1,33 +1,85 @@
 # GNN-SDN-APT Detection
 
-## Détection et mitigation automatisées des attaques APT par Graph Neural Networks dans un environnement SDN
+## Sujet du mémoire
 
-Projet de mémoire de Master 2 visant à concevoir un prototype reproductible capable de représenter dynamiquement une infrastructure réseau sous forme de graphe, de détecter des comportements suspects avec des Graph Neural Networks (GNN), puis de préparer une réponse réseau contrôlée via un contrôleur SDN.
+**Détection et mitigation automatisées des comportements APT par Graph Neural Networks dans un environnement SDN.**
 
-## Architecture de recherche
+Prototype de recherche M2 : collecte de statistiques OpenFlow, transformation en graphes temporels, comparaison d'une baseline classique avec GCN/GAT, puis génération d'alertes et réponse SDN contrôlée dans un laboratoire Mininet.
 
-`Mininet → Open vSwitch/OpenFlow → Ryu → collecte des flux → graphe dynamique → GNN → score de menace → moteur de décision → mitigation SDN`
+## Architecture
 
-## État actuel
+Mininet / hôtes privés → Open vSwitch / OpenFlow 1.3 → Ryu → flow_stats.csv → ingénierie des caractéristiques → graphes temporels NetworkX → Random Forest / GCN / GAT → score de menace → journal d'alerte → règle SDN temporaire optionnelle.
 
-La Phase 2 commence par une chaîne **observation-only** :
+## État du dépôt
 
-`Mininet → OVS/OpenFlow 1.3 → Ryu → flow_stats.csv`
+Le squelette de conception et le pipeline principal sont implémentés. Les tests unitaires et le workflow CI sont présents. La validation d'intégration réelle Mininet/Ryu reste à faire dans une VM Linux compatible ; aucune mesure expérimentale n'est revendiquée avant cette validation.
 
-Aucune mitigation automatique n'est encore activée. Cette séparation permet de valider d'abord la qualité et la reproductibilité des données avant d'introduire la détection et la réponse.
+## Installation Python
 
-## Phases
+Sous Linux/VM Linux, avec Mininet, Open vSwitch et Ryu installés :
 
-1. Conception et architecture
-2. Laboratoire Mininet/Ryu
-3. Collecte et normalisation
-4. Construction du graphe
-5. Baselines classiques
-6. GCN
-7. GAT
-8. Détection temps quasi réel
-9. Moteur de décision
-10. Mitigation SDN
-11. Évaluation
+    python3 -m venv --system-site-packages .venv
+    source .venv/bin/activate
+    pip install -e ".[dev]"
 
-Voir `docs/` pour la conception détaillée, `docs/07_execution.md` pour lancer le laboratoire, et `simulation/` + `sdn/` pour la première implémentation.
+Pour les modèles GNN :
+
+    pip install -e ".[ml]"
+
+## Démarrer le laboratoire
+
+Terminal 1 :
+
+    ryu-manager --ofp-tcp-listen-port 6653 sdn/ryu_app.py
+
+Terminal 2 :
+
+    sudo -E .venv/bin/python simulation/topology.py
+
+Dans la CLI Mininet :
+
+    scenarios
+    scenario normal
+    scenario recon
+    scenario lateral
+    scenario exfil
+
+Ces scénarios restent confinés aux hôtes privés 10.0.0.0/24. Les tentatives TCP sont bornées et n'exécutent pas d'exploits. Le transfert de données utilise des octets factices vers un récepteur dans la topologie.
+
+## Entraîner et comparer les modèles
+
+Après la collecte de flux et l'annotation des scénarios :
+
+    gnn-sdn-apt prepare
+    gnn-sdn-apt inspect
+    gnn-sdn-apt train-baseline
+    gnn-sdn-apt train-gnn --model gcn --epochs 100
+    gnn-sdn-apt train-gnn --model gat --epochs 100
+
+Les commandes GCN/GAT requièrent l'extra ML. Il faut collecter suffisamment de fenêtres annotées comprenant les deux classes avant l'entraînement. Les métriques sont sauvegardées dans reports/.
+
+## Inférence et mitigation optionnelle
+
+Après avoir entraîné le modèle :
+
+    python -m gnn_sdn_apt.live --model baseline --interval 5
+
+Les alertes et décisions sont écrites dans data/processed/. La mitigation SDN est désactivée par défaut et requiert une activation explicite dans le YAML ainsi que GNN_SDN_MITIGATION=1 dans l'environnement du contrôleur. Les blocs n'acceptent que des sources du sous-réseau de laboratoire et expirent après 60 secondes. Ne pas l'activer sur un réseau de production.
+
+## Documentation
+
+- docs/01_conception.md — problématique et objectifs
+- docs/02_architecture.md — architecture technique
+- docs/03_methodologie.md — méthodologie
+- docs/04_dataset.md — données et graphes
+- docs/05_scenarios.md — scénarios
+- docs/06_roadmap.md — état d'avancement
+- docs/08_execution.md — procédure d'exécution complète
+- docs/09_evaluation_protocol.md — protocole expérimental
+- docs/10_data_dictionary.md — dictionnaire des données
+
+## Tests
+
+    pytest -q
+
+GitHub Actions lance également les tests unitaires à chaque push et pull request. Les tests de bout en bout nécessitent Mininet, Open vSwitch et Ryu sur une VM Linux ; ils ne peuvent pas être certifiés par les tests Python unitaires seuls.
