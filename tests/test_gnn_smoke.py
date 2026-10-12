@@ -42,3 +42,12 @@ def test_gnn_train_and_save_checkpoint_on_synthetic_graphs(tmp_path, model_name)
     assert report["split_method"] == "temporal-train-validation-test"
     assert report["test_observations"] > 0
     assert 0.0 <= report["f1"] <= 1.0
+
+    from gnn_sdn_apt.graph.io import read_graphs
+    from gnn_sdn_apt.inference import load_saved_threshold, score_gnn_nodes
+
+    latest_snapshot = read_graphs(graphs)[-1]
+    scores = score_gnn_nodes(latest_snapshot, checkpoint)
+    assert scores
+    assert all(0.0 <= item["score"] <= 1.0 for item in scores)
+    assert 0.0 <= load_saved_threshold(model_name, checkpoint) <= 1.0
