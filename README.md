@@ -59,6 +59,35 @@ Cette commande génère une capture fictive et ses annotations, prépare les fea
 
 **Important :** les métriques de ce smoke test servent uniquement à vérifier le fonctionnement du logiciel. Elles ne représentent pas la performance du détecteur sur de vraies attaques ou des APT. Pour l'évaluation du mémoire, utiliser des données collectées et annotées dans le labo ou un dataset public adapté.
 
+## Comment l'IA intervient dans le pipeline
+
+L'IA n'est pas un chatbot : ce sont des modèles de classification entraînés sur des exemples de trafic annotés. Une ligne de décision correspond à un hôte source dans une fenêtre temporelle.
+
+1. Ryu écrit les statistiques OpenFlow dans le fichier de flux.
+2. Le pipeline calcule les caractéristiques et construit un graphe par fenêtre : les hôtes sont les nœuds, les communications sont les arêtes.
+3. Le modèle attribue à chaque hôte source un score entre 0 et 1. La Random Forest utilise les caractéristiques de l'hôte ; GCN et GAT exploitent aussi les relations entre hôtes.
+4. Le seuil configuré convertit le score en décision. Par défaut, le service génère seulement des alertes ; le blocage SDN est une option séparée et désactivée par défaut.
+
+### Essayer le cycle complet avec les données synthétiques
+
+La démonstration inclut les modèles GCN et GAT si l'extra ML est installé :
+
+    pip install -e ".[ml]"
+    python scripts/run_demo.py --output-dir data/demo --with-gnn --epochs 3
+
+Pour entraîner un modèle sur les données préparées du laboratoire, après avoir collecté et annoté suffisamment de fenêtres normales et suspectes :
+
+    gnn-sdn-apt prepare
+    gnn-sdn-apt train-gnn --model gcn --epochs 100 --calibrate-threshold
+
+L'inférence continue peut alors utiliser ce modèle :
+
+    gnn-sdn-apt-live --model gcn --interval 5
+
+Pour GAT, remplacer `gcn` par `gat`. Pour la baseline, entraîner avec `gnn-sdn-apt train-baseline --calibrate-threshold`, puis lancer `gnn-sdn-apt-live --model baseline --interval 5`.
+
+Le modèle chargé en direct doit avoir été entraîné sur le même schéma de caractéristiques. Les alertes et décisions sont écrites dans les chemins définis dans `config/config.yaml`. Le score est une estimation apprise à partir des données d'entraînement, pas une preuve qu'une APT est présente. Les performances ne sont pas validées tant que le pipeline n'a pas été évalué sur des captures annotées et séparées chronologiquement.
+
 ## Importer un dataset public horodaté
 
 L'importeur générique convertit notamment des CSV de type CICFlowMeter/UNSW vers le schéma du projet. Les labels de catégorie d'attaque deviennent « normal vs attaque » et ne doivent pas être décrits comme des labels APT spécifiques.
@@ -106,3 +135,4 @@ Les alertes et décisions sont écrites dans data/processed/. En cas de blocage 
     pytest -q
 
 GitHub Actions lance également les tests unitaires à chaque push et pull request. Les tests de bout en bout nécessitent Mininet, Open vSwitch et Ryu sur une VM Linux ; ils ne peuvent pas être certifiés par les tests Python unitaires seuls.
+
