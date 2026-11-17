@@ -4,7 +4,8 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -90,3 +91,51 @@ def ingest_ryu_csv(
         "findings": len(findings),
         "database": str(database_path),
     }
+
+
+
+def persist_model_findings(
+    database_path: str | Path,
+    scores: list[dict[str, Any]],
+    *,
+    model_name: str,
+    threshold: float,
+    window_seconds: int = 10,
+) -> int:
+    """Persist above-threshold model scores as SIEM incidents, without mitigation."""
+    if not 0.0 <= float(threshold) <= 1.0 or window_seconds < 1:
+        raise ValueError("invalid model incident threshold or time window")
+    store = SQLiteSiemStore(database_path)
+    previous = {item["incident_id"]: item for item in store.list_incidents()}
+    persisted = 0
+    for item in scores:
+        score = float(item["score"])
+        if score < threshold:
+            continue
+        source_ip = str(item["source_ip"])
+        timestamp = float(item.get("timestamp", 0.0))
+        bucket = int(timestamp // window_seconds)
+        incident_id = str(uuid.uuid5(
+            uuid.NAMESPACE_URL, f"model-score:{model_name}:{source_ip}:{bucket}"
+        ))
+        observed_at = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(
+            timespec="milliseconds"
+        ).replace("+00:00", "Z")
+        existing = previous.get(incident_id)
+        store.upsert_incident({
+            "incident_id": incident_id,
+            "rule_id": f"MODEL-{model_name.upper()}-THRESHOLD",
+            "host": source_ip,
+            "status": existing["status"] if existing else "open",
+            "severity": "high" if score >= min(1.0, threshold + 0.1) else "medium",
+            "confidence": score,
+            "first_seen": existing["first_seen"] if existing else observed_at,
+            "last_seen": observed_at,
+            "event_ids": existing.get("event_ids", []) if existing else [],
+            "summary": (
+                f"{model_name.upper()} threat score {score:.3f} exceeded "
+                f"the configured threshold {threshold:.3f} for {source_ip}."
+            ),
+        })
+        persisted += 1
+    return persisted
