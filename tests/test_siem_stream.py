@@ -85,3 +85,23 @@ def test_incremental_ingestion_resets_after_truncation_or_rotation(tmp_path):
     assert result["cursor_reset"] is True
     # The rewritten row is deduplicated if its identity is unchanged.
     assert len(SQLiteSiemStore(database).list_events()) >= 1
+
+
+def test_incremental_ingestion_detects_same_size_rewrite(tmp_path):
+    raw, database = tmp_path / "flow_stats.csv", tmp_path / "siem.db"
+    _write(raw, 2)
+    ingest_ryu_csv_incremental(raw, database)
+    before_size = raw.stat().st_size
+
+    rows = [_row(0), _row(1)]
+    rows[1]["ip_dst"] = "10.0.9.9"
+    _write(raw, 0)
+    with raw.open("a", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+    assert raw.stat().st_size == before_size
+
+    result = ingest_ryu_csv_incremental(raw, database)
+    assert result["cursor_reset"] is True
+    assert len(SQLiteSiemStore(database).list_events()) == 3
