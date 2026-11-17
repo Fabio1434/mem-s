@@ -1,6 +1,6 @@
 # SIEM léger — ingestion et corrélation opérationnelles
 
-Les modules `gnn_sdn_apt.siem` et `gnn_sdn_apt.siem_ingest` fournissent une couche SIEM légère intégrée au service d'inférence live.
+Les modules `gnn_sdn_apt.siem`, `gnn_sdn_apt.siem_ingest` et `gnn_sdn_apt.siem_stream` fournissent une couche SIEM légère intégrée au service d'inférence live.
 
 ## Fonctions
 
@@ -9,6 +9,8 @@ Les modules `gnn_sdn_apt.siem` et `gnn_sdn_apt.siem_ingest` fournissent une couc
 - Stockage SQLite des événements et du cycle de vie des incidents.
 - Import des statistiques du collecteur Ryu depuis `data/raw/flow_stats.csv`.
 - Identifiants stables afin de rendre les cycles de polling idempotents.
+- Ingestion incrémentale : seuls les nouveaux enregistrements CSV complets sont lus ; le curseur (offset, numéro de ligne, signature et empreinte de contrôle) est conservé dans SQLite.
+- Reprise après redémarrage, détection du remplacement, de la troncature et des réécritures détectables du fichier ; une ligne finale incomplète est attendue jusqu'à l'arrivée du saut de ligne.
 - Corrélation explicable du fan-out par hôte et fenêtre temporelle.
 - Persistance des alertes dépassant le seuil du modèle baseline/GCN/GAT comme incidents SIEM.
 - Conservation du statut d'un incident existant lors d'une nouvelle ingestion.
@@ -57,7 +59,7 @@ stored = store.add_event(event)
 findings = correlate_events([stored], window_seconds=60, min_distinct_destinations=5)
 ```
 
-La règle fan-out constitue un indicateur de reconnaissance réseau, pas une preuve d'APT. Les événements sans annotation gardent le label `-1` ; ils ne sont pas convertis en trafic normal. La corrélation live travaille sur la fenêtre temporelle la plus récente du CSV. Les anciennes observations sont conservées dans SQLite, mais ne sont pas réalertées à chaque cycle.
+La règle fan-out constitue un indicateur de reconnaissance réseau, pas une preuve d'APT. Les événements sans annotation gardent le label `-1` ; ils ne sont pas convertis en trafic normal. La corrélation live travaille sur la fenêtre temporelle la plus récente des événements déjà centralisés dans SQLite. Le collecteur ne relit pas le CSV entier à chaque cycle : il reprend au dernier offset confirmé. Si le processus s'arrête avant la sauvegarde du curseur, les lignes sont rejouées sans doublon grâce aux identifiants stables.
 
 ## Tests
 
