@@ -5,7 +5,7 @@ import argparse
 import html
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from .config import load_config
 from .siem import SQLiteSiemStore
@@ -90,6 +90,12 @@ def create_handler(database_path: str):
                 self._send(200, body, "application/json; charset=utf-8")
             elif parsed.path == "/api/events":
                 body = json.dumps(store.list_events(limit=limit), ensure_ascii=False).encode("utf-8")
+                self._send(200, body, "application/json; charset=utf-8")
+            elif parsed.path.startswith("/api/incidents/") and parsed.path.endswith("/history"):
+                incident_id = unquote(parsed.path[len("/api/incidents/"):-len("/history")].strip("/"))
+                body = json.dumps(
+                    store.list_incident_history(incident_id), ensure_ascii=False
+                ).encode("utf-8")
                 self._send(200, body, "application/json; charset=utf-8")
             else:
                 self._send(404, b'{"error":"not_found"}', "application/json; charset=utf-8")
