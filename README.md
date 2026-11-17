@@ -136,3 +136,26 @@ Les alertes et décisions sont écrites dans data/processed/. En cas de blocage 
 
 GitHub Actions lance également les tests unitaires à chaque push et pull request. Les tests de bout en bout nécessitent Mininet, Open vSwitch et Ryu sur une VM Linux ; ils ne peuvent pas être certifiés par les tests Python unitaires seuls.
 
+## SIEM léger — ingestion, stockage et corrélation
+
+Une première couche SIEM indépendante de Mininet/Ryu est disponible :
+
+- normalisation des événements réseau vers un schéma canonique UTC ;
+- stockage append-only JSONL pour l'audit ;
+- stockage SQLite des événements et incidents ;
+- corrélation explicable des connexions vers plusieurs destinations dans une fenêtre temporelle.
+
+Exemple d'utilisation :
+
+```python
+from gnn_sdn_apt.siem import JsonlEventStore, SQLiteSiemStore, correlate_events
+
+event = {"timestamp": 1700000000, "ip_src": "10.0.0.1",
+         "ip_dst": "10.0.0.2", "ip_proto": 6, "byte_count": 1200}
+JsonlEventStore("data/siem/events.jsonl").append(event)
+store = SQLiteSiemStore("data/siem/siem.db")
+stored = store.add_event(event)
+findings = correlate_events([stored], window_seconds=60, min_distinct_destinations=5)
+```
+
+Voir [docs/12_siem_module.md](docs/12_siem_module.md). Cette règle est un indicateur de fan-out/reconnaissance, pas une preuve d'APT. Les événements non annotés conservent le label `-1`. Le module n'exécute aucune mitigation.
