@@ -52,8 +52,8 @@
 - [ ] Mesurer l'impact sur le trafic légitime et les faux blocages
 
 ## Phase 7 — Supervision
-- [ ] Développer un tableau de bord Flask en lecture seule
-- [ ] Afficher événements, alertes, incidents et scores par hôte
+- [x] Développer un tableau de bord local en lecture seule (stdlib, sans dépendance Flask)
+- [x] Afficher les événements et incidents récents, avec score de confiance
 - [ ] Afficher l'historique et les latences de mitigation
 
 ## Phase 8 — Évaluation scientifique et rédaction
