@@ -8,7 +8,7 @@ Prototype de recherche M2 : collecte de statistiques OpenFlow, transformation en
 
 ## Architecture
 
-Mininet / hôtes privés → Open vSwitch / OpenFlow 1.3 → Ryu → flow_stats.csv → ingénierie des caractéristiques → graphes temporels NetworkX → Random Forest / GCN / GAT → score de menace → journal d'alerte → règle SDN temporaire optionnelle.
+Mininet / hôtes privés → Open vSwitch / OpenFlow 1.3 → Ryu → flow_stats.csv → ingestion SIEM SQLite / corrélation → ingénierie des caractéristiques → graphes temporels NetworkX → Random Forest / GCN / GAT → score de menace → alertes / incidents → règle SDN temporaire optionnelle.
 
 ## État du dépôt
 
@@ -127,6 +127,8 @@ Les alertes et décisions sont écrites dans data/processed/. En cas de blocage 
 - docs/08_execution.md — procédure d'exécution complète
 - docs/09_evaluation_protocol.md — protocole expérimental
 - docs/10_data_dictionary.md — dictionnaire des données
+- docs/11_siem_lightweight_design.md — conception du SIEM léger
+- docs/12_siem_module.md — ingestion et corrélation SIEM
 
 ## Vérifications et tests
 
@@ -158,4 +160,4 @@ stored = store.add_event(event)
 findings = correlate_events([stored], window_seconds=60, min_distinct_destinations=5)
 ```
 
-Voir [docs/12_siem_module.md](docs/12_siem_module.md). Cette règle est un indicateur de fan-out/reconnaissance, pas une preuve d'APT. Les événements non annotés conservent le label `-1`. Le module n'exécute aucune mitigation.
+Le service `gnn-sdn-apt-live` ingère également les lignes Ryu de `flow_stats.csv` dans `data/siem/siem.db` et met à jour les incidents corrélés. Le paramètre `siem.enabled` permet de désactiver cette ingestion. Voir [docs/12_siem_module.md](docs/12_siem_module.md). La règle fan-out est un indicateur de reconnaissance, pas une preuve d'APT. Les événements non annotés conservent le label `-1`. L'ingestion SIEM n'exécute aucune mitigation.
