@@ -76,3 +76,32 @@ def test_invalid_parameters_are_rejected():
         correlate_events([], window_seconds=0)
     with pytest.raises(TypeError):
         normalize_event(["not", "a", "mapping"])
+
+
+
+def test_incident_lifecycle_transitions_are_validated_and_audited(tmp_path):
+    store = SQLiteSiemStore(tmp_path / "siem.db")
+    store.upsert_incident({
+        "incident_id": "lifecycle-1", "rule_id": "test", "host": "10.0.0.9",
+        "status": "open", "severity": "medium", "confidence": 0.8,
+        "first_seen": "2023-11-14T22:13:20Z",
+        "last_seen": "2023-11-14T22:13:20Z",
+        "event_ids": [], "summary": "lifecycle test",
+    })
+
+    store.transition_incident("lifecycle-1", "investigating", changed_by="analyst")
+    store.transition_incident("lifecycle-1", "contained", changed_by="analyst",
+                              note="lab host isolated")
+    store.transition_incident("lifecycle-1", "closed", changed_by="analyst")
+
+    assert store.list_incidents()[0]["status"] == "closed"
+    history = store.list_incident_history("lifecycle-1")
+    assert [item["new_status"] for item in history] == [
+        "investigating", "contained", "closed"
+    ]
+    assert history[1]["note"] == "lab host isolated"
+
+    with pytest.raises(ValueError):
+        store.transition_incident("lifecycle-1", "open")
+    with pytest.raises(KeyError):
+        store.transition_incident("missing", "open")
