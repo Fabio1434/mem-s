@@ -20,6 +20,7 @@ from .graph.builder import build_graph_snapshots
 from .graph.io import write_graphs
 from .inference import load_saved_threshold, score_baseline_nodes, score_gnn_nodes
 from .features import prepare_flow_file
+from .siem_ingest import ingest_ryu_csv
 
 LOGGER = logging.getLogger("gnn_sdn_apt.live")
 _LAST_EMITTED: dict[tuple[str, str], float] = {}
@@ -45,6 +46,21 @@ def run_once(
     if not raw_path.exists() or raw_path.stat().st_size == 0:
         LOGGER.warning("No raw flow data is available yet: %s", raw_path)
         return 0
+
+    siem_config = config.get("siem", {})
+    if bool(siem_config.get("enabled", True)):
+        siem_result = ingest_ryu_csv(
+            raw_path,
+            paths.get("siem_db", "data/siem/siem.db"),
+            window_seconds=int(siem_config.get("correlation_window_seconds", 60)),
+            min_distinct_destinations=int(siem_config.get("min_distinct_destinations", 5)),
+        )
+        LOGGER.info(
+            "SIEM ingestion: events=%d recent=%d findings=%d",
+            siem_result["events_read"],
+            siem_result.get("recent_events", 0),
+            siem_result["findings"],
+        )
 
     features = prepare_flow_file(
         raw_path,
