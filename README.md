@@ -138,7 +138,7 @@ Les alertes et décisions sont écrites dans data/processed/. En cas de blocage 
 
 GitHub Actions lance également les tests unitaires à chaque push et pull request. Les tests de bout en bout nécessitent Mininet, Open vSwitch et Ryu sur une VM Linux ; ils ne peuvent pas être certifiés par les tests Python unitaires seuls.
 
-## SIEM léger — ingestion, stockage et corrélation
+## SIEM léger — ingestion, stockage, corrélation et supervision
 
 Une première couche SIEM indépendante de Mininet/Ryu est disponible :
 
@@ -160,4 +160,8 @@ stored = store.add_event(event)
 findings = correlate_events([stored], window_seconds=60, min_distinct_destinations=5)
 ```
 
-Le service `gnn-sdn-apt-live` ingère également les lignes Ryu de `flow_stats.csv` dans `data/siem/siem.db` et met à jour les incidents corrélés. Le paramètre `siem.enabled` permet de désactiver cette ingestion. Voir [docs/12_siem_module.md](docs/12_siem_module.md). La règle fan-out est un indicateur de reconnaissance, pas une preuve d'APT. Les événements non annotés conservent le label `-1`. L'ingestion SIEM n'exécute aucune mitigation.
+Le service `gnn-sdn-apt-live` ingère également les lignes Ryu de `flow_stats.csv` dans `data/siem/siem.db`, met à jour les incidents corrélés et persiste les scores baseline/GCN/GAT dépassant le seuil. Le paramètre `siem.enabled` permet de désactiver cette ingestion. Un tableau de bord local en lecture seule est disponible :
+
+    gnn-sdn-apt-dashboard --host 127.0.0.1 --port 8080
+
+Ouvrir ensuite `http://127.0.0.1:8080`. Voir [docs/12_siem_module.md](docs/12_siem_module.md). La règle fan-out et les scores modèles sont des indicateurs, pas une preuve d'APT. Les événements non annotés conservent le label `-1`. Le dashboard n'offre aucune action de mitigation.
