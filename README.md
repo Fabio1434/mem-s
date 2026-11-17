@@ -160,7 +160,7 @@ stored = store.add_event(event)
 findings = correlate_events([stored], window_seconds=60, min_distinct_destinations=5)
 ```
 
-Le service `gnn-sdn-apt-live` ingère également les lignes Ryu de `flow_stats.csv` dans `data/siem/siem.db`, met à jour les incidents corrélés et persiste les scores baseline/GCN/GAT dépassant le seuil. Le paramètre `siem.enabled` permet de désactiver cette ingestion. Un tableau de bord local en lecture seule est disponible :
+Le service `gnn-sdn-apt-live` ingère également les lignes Ryu de `flow_stats.csv` dans `data/siem/siem.db`, met à jour les incidents corrélés et persiste les scores baseline/GCN/GAT dépassant le seuil. L'ingestion est incrémentale : le curseur est conservé dans SQLite, les lignes incomplètes sont différées et le service détecte les rotations/troncatures du CSV. Le paramètre `siem.enabled` permet de désactiver cette ingestion. Un tableau de bord local en lecture seule est disponible :
 
     gnn-sdn-apt-dashboard --host 127.0.0.1 --port 8080
 
