@@ -20,7 +20,8 @@ from .graph.builder import build_graph_snapshots
 from .graph.io import write_graphs
 from .inference import load_saved_threshold, score_baseline_nodes, score_gnn_nodes
 from .features import prepare_flow_file
-from .siem_ingest import ingest_ryu_csv, persist_model_findings
+from .siem_ingest import persist_model_findings
+from .siem_stream import ingest_ryu_csv_incremental
 
 LOGGER = logging.getLogger("gnn_sdn_apt.live")
 _LAST_EMITTED: dict[tuple[str, str], float] = {}
@@ -50,7 +51,7 @@ def run_once(
     siem_config = config.get("siem", {})
     siem_enabled = bool(siem_config.get("enabled", True))
     if siem_enabled:
-        siem_result = ingest_ryu_csv(
+        siem_result = ingest_ryu_csv_incremental(
             raw_path,
             paths.get("siem_db", "data/siem/siem.db"),
             window_seconds=int(siem_config.get("correlation_window_seconds", 60)),
