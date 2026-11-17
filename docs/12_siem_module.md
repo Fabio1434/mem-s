@@ -10,11 +10,12 @@ Les modules `gnn_sdn_apt.siem` et `gnn_sdn_apt.siem_ingest` fournissent une couc
 - Import des statistiques du collecteur Ryu depuis `data/raw/flow_stats.csv`.
 - Identifiants stables afin de rendre les cycles de polling idempotents.
 - Corrélation explicable du fan-out par hôte et fenêtre temporelle.
+- Persistance des alertes dépassant le seuil du modèle baseline/GCN/GAT comme incidents SIEM.
 - Conservation du statut d'un incident existant lors d'une nouvelle ingestion.
 
 ## Intégration au service live
 
-Le service `gnn-sdn-apt-live` exécute l'ingestion SIEM avant le scoring GNN/baseline. La configuration est définie dans `config/config.yaml` :
+Le service `gnn-sdn-apt-live` exécute l'ingestion Ryu avant le scoring, puis enregistre les scores baseline/GCN/GAT dépassant le seuil comme incidents persistants. La configuration est définie dans `config/config.yaml` :
 
 ```yaml
 paths:
@@ -26,7 +27,7 @@ siem:
   min_distinct_destinations: 5
 ```
 
-L'ingestion est passive : elle ne modifie pas les règles OpenFlow et n'active pas la mitigation. La base SQLite est créée automatiquement.
+L'ingestion et la création des incidents sont passives : elles ne modifient pas les règles OpenFlow et n'activent pas la mitigation. Les scores ne constituent pas une preuve d'APT. La base SQLite est créée automatiquement.
 
 ## Utilisation autonome
 
