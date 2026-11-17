@@ -24,6 +24,7 @@
 - [x] Ajouter une première règle de corrélation explicable par hôte/fenêtre (fan-out)
 - [x] Ajouter SQLite pour l'indexation des événements et la persistance des incidents
 - [x] Ajouter des tests unitaires pour normalisation, stockage, corrélation et ingestion CSV Ryu
+- [x] Ajouter une ingestion CSV incrémentale avec curseur SQLite, reprise après redémarrage et détection de rotation/troncature
 - [ ] Valider l'intégration de bout en bout dans Mininet/OVS/Ryu
 
 ## Phase 4 — Modélisation GNN
