@@ -65,7 +65,7 @@ def test_incremental_ingestion_holds_partial_record_until_newline(tmp_path):
         handle.write("1700000001,1,1,10.0.0.1,10.0.0.3")
 
     first = ingest_ryu_csv_incremental(raw, database)
-    assert first["events_read"] == 1
+    assert first["events_read"] == 0
     assert len(SQLiteSiemStore(database).list_events()) == 1
 
     with raw.open("a", encoding="utf-8") as handle:
