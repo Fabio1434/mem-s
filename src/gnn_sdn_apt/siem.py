@@ -119,6 +119,16 @@ class SQLiteSiemStore:
                     summary TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
+                CREATE TABLE IF NOT EXISTS incident_history (
+                    history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    incident_id TEXT NOT NULL,
+                    changed_at TEXT NOT NULL,
+                    old_status TEXT NOT NULL,
+                    new_status TEXT NOT NULL,
+                    changed_by TEXT NOT NULL,
+                    note TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_incident_history_id ON incident_history(incident_id, history_id);
             """)
 
     def _connect(self):
@@ -185,6 +195,68 @@ class SQLiteSiemStore:
             item["event_ids"] = json.loads(item.pop("event_ids_json"))
             result.append(item)
         return result
+
+
+    def transition_incident(
+        self,
+        incident_id: str,
+        new_status: str,
+        *,
+        changed_by: str = "system",
+        note: str = "",
+    ) -> dict[str, Any]:
+        """Apply an allowed incident-state transition and append an audit record."""
+        transitions = {
+            "open": {"investigating", "contained", "closed"},
+            "investigating": {"open", "contained", "closed"},
+            "contained": {"investigating", "closed"},
+            "closed": set(),
+        }
+        if new_status not in transitions:
+            raise ValueError(f"unknown incident status: {new_status}")
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT * FROM incidents WHERE incident_id=?", (incident_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"incident not found: {incident_id}")
+            old_status = row["status"]
+            if new_status == old_status:
+                return self._incident_row(row)
+            if new_status not in transitions.get(old_status, set()):
+                raise ValueError(f"transition not allowed: {old_status} -> {new_status}")
+            changed_at = _utc_timestamp()
+            db.execute(
+                "UPDATE incidents SET status=? WHERE incident_id=?",
+                (new_status, incident_id),
+            )
+            db.execute(
+                """INSERT INTO incident_history
+                (incident_id,changed_at,old_status,new_status,changed_by,note)
+                VALUES (?,?,?,?,?,?)""",
+                (incident_id, changed_at, old_status, new_status,
+                 str(changed_by), str(note)),
+            )
+            updated = db.execute(
+                "SELECT * FROM incidents WHERE incident_id=?", (incident_id,)
+            ).fetchone()
+        return self._incident_row(updated)
+
+    @staticmethod
+    def _incident_row(row: sqlite3.Row) -> dict[str, Any]:
+        item = dict(row)
+        item["event_ids"] = json.loads(item.pop("event_ids_json"))
+        return item
+
+    def list_incident_history(self, incident_id: str) -> list[dict[str, Any]]:
+        """Return the append-only status-transition audit trail for one incident."""
+        with self._connect() as db:
+            rows = db.execute(
+                """SELECT changed_at,old_status,new_status,changed_by,note
+                FROM incident_history WHERE incident_id=? ORDER BY history_id""",
+                (incident_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
 
 def correlate_events(
