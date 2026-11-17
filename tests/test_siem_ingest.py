@@ -1,7 +1,7 @@
 import csv
 
 from gnn_sdn_apt.siem import SQLiteSiemStore
-from gnn_sdn_apt.siem_ingest import ingest_ryu_csv
+from gnn_sdn_apt.siem_ingest import ingest_ryu_csv, persist_model_findings
 
 
 def _write_flows(path):
@@ -67,3 +67,36 @@ def test_missing_csv_is_a_safe_noop(tmp_path):
     result = ingest_ryu_csv(tmp_path / "missing.csv", tmp_path / "siem.db")
     assert result["events_read"] == 0
     assert result["findings"] == 0
+
+
+
+def test_model_scores_create_persistent_incidents_and_preserve_status(tmp_path):
+    database = tmp_path / "siem.db"
+    scores = [{"source_ip": "10.0.0.7", "score": 0.96, "timestamp": 1700000000}]
+    assert persist_model_findings(
+        database, scores, model_name="gcn", threshold=0.9, window_seconds=10
+    ) == 1
+
+    store = SQLiteSiemStore(database)
+    incident = store.list_incidents()[0]
+    assert incident["rule_id"] == "MODEL-GCN-THRESHOLD"
+    assert incident["severity"] == "high"
+    assert incident["confidence"] == 0.96
+
+    incident["status"] = "contained"
+    store.upsert_incident(incident)
+    persist_model_findings(
+        database, scores, model_name="gcn", threshold=0.9, window_seconds=10
+    )
+    assert store.list_incidents()[0]["status"] == "contained"
+
+
+def test_model_scores_below_threshold_do_not_create_incidents(tmp_path):
+    count = persist_model_findings(
+        tmp_path / "siem.db",
+        [{"source_ip": "10.0.0.8", "score": 0.2, "timestamp": 1700000000}],
+        model_name="baseline",
+        threshold=0.9,
+    )
+    assert count == 0
+    assert SQLiteSiemStore(tmp_path / "siem.db").list_incidents() == []
