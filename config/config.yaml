@@ -12,6 +12,7 @@ paths:
   alerts: data/processed/alerts.jsonl
   decisions: data/processed/decisions.jsonl
   mitigation_events: data/processed/mitigation_events.jsonl
+  siem_db: data/siem/siem.db
 
 graph:
   directed: true
@@ -38,3 +39,9 @@ sdn:
 
 logging:
   level: INFO
+
+siem:
+  # Passive ingestion/correlation is safe to run in observation-only mode.
+  enabled: true
+  correlation_window_seconds: 60
+  min_distinct_destinations: 5
