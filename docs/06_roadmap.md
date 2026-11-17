@@ -19,11 +19,12 @@
 - [x] Produire des annotations de scénarios
 - [x] Produire des alertes, décisions et journaux de mitigation en JSONL
 - [x] Définir la cible fonctionnelle de normalisation et centralisation dans docs/11
-- [ ] Implémenter un schéma canonique d'événement avec provenance et identifiant
+- [x] Implémenter un schéma canonique d'événement avec provenance et identifiant
 - [ ] Centraliser les événements normalisés en JSONL append-only
-- [ ] Ajouter des règles de corrélation explicables par hôte/fenêtre
-- [ ] Ajouter SQLite pour l'indexation et le cycle de vie des incidents
-- [ ] Ajouter des tests unitaires et d'intégration du pipeline SIEM
+- [x] Ajouter une première règle de corrélation explicable par hôte/fenêtre (fan-out)
+- [x] Ajouter SQLite pour l'indexation des événements et la persistance des incidents
+- [x] Ajouter des tests unitaires pour normalisation, stockage, corrélation et ingestion CSV Ryu
+- [ ] Valider l'intégration de bout en bout dans Mininet/OVS/Ryu
 
 ## Phase 4 — Modélisation GNN
 - [x] Préparer les caractéristiques des hôtes et des flux
@@ -37,9 +38,9 @@
 ## Phase 5 — Détection et incidents
 - [x] Inférence périodique et score de menace
 - [x] Alertes et décisions JSONL
-- [ ] Ajouter une déduplication stable des alertes et un niveau de gravité
-- [ ] Relier les alertes à des incidents persistants
-- [ ] Ajouter les transitions open / investigating / contained / closed
+- [x] Ajouter des identifiants stables d'incident et des niveaux de gravité
+- [x] Relier les scores baseline/GCN/GAT au stockage des incidents persistants
+- [ ] Ajouter une API contrôlée pour les transitions open / investigating / contained / closed
 - [ ] Évaluer la qualité de détection et les faux positifs
 
 ## Phase 6 — Mitigation SDN
