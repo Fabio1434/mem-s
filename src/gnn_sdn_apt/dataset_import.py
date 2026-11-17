@@ -58,7 +58,7 @@ def _labels(series: pd.Series | None, count: int) -> tuple[list[int], list[str]]
     labels: list[int] = []
     scenarios: list[str] = []
     for original, number in zip(series.astype(str).tolist(), numeric.tolist(), strict=True):
-        token = original.strip().lower()
+        token = str(original).strip().lower()
         if token in BENIGN_LABELS:
             labels.append(0)
             scenarios.append("normal")
