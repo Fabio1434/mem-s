@@ -21,7 +21,7 @@
 - [x] Construire des snapshots de graphes temporels NetworkX
 - [x] Sérialiser les graphes en JSONL
 - [x] Ajouter des tests unitaires et une capture synthétique reproductible
-- [ ] Valider le volume et la qualité des données réelles du laboratoire
+- [x] Ajouter une première normalisation canonique indépendante du contrôleur\n- [x] Ajouter le stockage append-only JSONL et SQLite des événements/incidents\n- [x] Ajouter une corrélation explicable de fan-out par hôte et fenêtre temporelle\n- [ ] Connecter le collecteur Ryu au stockage SIEM canonique\n- [ ] Valider le volume et la qualité des données réelles du laboratoire
 
 ## Phase 4 — Modèles IA
 - [x] Random Forest comme baseline
@@ -36,7 +36,7 @@
 - [x] Score de menace et seuil configurable
 - [x] Journaux d'alertes et de décisions
 - [x] Cooldown des alertes par hôte
-- [ ] Calibrer le seuil avec un jeu de validation réel dédié
+- [x] Ajouter les tests unitaires du module SIEM (normalisation, JSONL, SQLite, corrélation)\n- [ ] Connecter les findings SIEM au moteur de score GNN et à la gestion complète des incidents\n- [ ] Calibrer le seuil avec un jeu de validation réel dédié
 
 ## Phase 6 — Mitigation SDN
 - [x] Liaison des décisions au contrôleur Ryu
