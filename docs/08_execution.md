@@ -1,51 +1,77 @@
-# 08 — Installation et exécution complète
+# 08 — Installation et exécution
 
-## 1. Environnement
+## 1. Préparer la VM Linux
 
-Le laboratoire SDN doit être exécuté sur Linux ou dans une VM Linux. Mininet et Open vSwitch nécessitent des privilèges système et ne sont pas pris en charge directement sur Windows natif.
+Le laboratoire nécessite Linux avec Mininet, Open vSwitch et Ryu. Kali peut être utilisé, mais il faut vérifier la version Python disponible avant d'installer les dépendances. Ne pas remplacer le Python système de Kali et ne pas utiliser `sudo pip`.
 
-Installer les dépendances système Mininet, Open vSwitch et une version compatible de Ryu selon la distribution. Le dépôt sépare volontairement les dépendances SDN système des bibliothèques Python d'analyse.
+Vérifier l'environnement :
 
-Depuis la racine du dépôt :
+    cat /etc/os-release
+    python3 --version
+    uname -r
 
+Installer les paquets système depuis les dépôts de la distribution :
+
+    sudo apt update
+    sudo apt install -y git curl wget python3-venv python3-pip python3-dev build-essential iproute2 iputils-ping net-tools openvswitch-switch openvswitch-common mininet
+
+Démarrer et vérifier Open vSwitch :
+
+    sudo systemctl enable --now openvswitch-switch
+    sudo systemctl status openvswitch-switch --no-pager
+    sudo ovs-vsctl show
+
+Vérifier Mininet :
+
+    mn --version
+    sudo mn --switch ovsbr --test pingall
+
+Le résultat attendu est 0 % de paquets perdus entre les hôtes du test. Si le service OVS ou le test Mininet échoue, résoudre cette étape avant de poursuivre.
+
+## 2. Préparer le dépôt et l'environnement Python
+
+    git clone https://github.com/Fabio1434/mem-s.git
+    cd mem-s
     python3 -m venv --system-site-packages .venv
     source .venv/bin/activate
-    python -m pip install --upgrade pip
+    python -m pip install --upgrade pip setuptools wheel
     pip install -e ".[dev]"
+
+L'option `--system-site-packages` permet à l'environnement virtuel d'accéder aux modules Mininet installés par le système lorsque la distribution les expose de cette façon. Si l'import Mininet échoue, vérifier le chemin du module et le Python utilisé avant de modifier les paquets système.
+
+Installer Ryu selon une version Python/dépendances compatible avec la distribution. Éviter de forcer une installation sous Python 3.14 si ses dépendances ne sont pas compatibles ; privilégier un environnement Python pris en charge sans modifier le Python système. Le dépôt n'impose pas une version Ryu universelle.
+
+Exécuter le diagnostic :
+
     python scripts/check_environment.py
 
-Le diagnostic signale aussi les dépendances système Mininet/Open vSwitch/Ryu et indique si le contrôleur écoute déjà sur le port 6653.
+## 3. Installer les dépendances GNN
 
-Pour activer les modèles GNN :
+Après validation du socle Python :
 
     pip install -e ".[ml]"
 
-Si les dépendances PyTorch doivent correspondre à CUDA, installer d'abord la version PyTorch adaptée à la machine puis installer PyTorch Geometric selon leurs instructions officielles.
+Si PyTorch nécessite une roue spécifique à la plateforme ou au matériel, suivre les instructions officielles PyTorch pour installer la bonne version avant PyTorch Geometric.
 
-## 2. Smoke test logiciel sans Mininet
-
-Cette étape valide le pipeline Python de bout en bout sur une capture entièrement synthétique. Elle ne nécessite ni Ryu ni Open vSwitch et ne constitue pas une expérience de détection réelle.
+## 4. Smoke test logiciel sans Mininet
 
     python scripts/run_demo.py --output-dir data/demo
 
-La commande produit la capture, les annotations, les features, les graphes, un modèle Random Forest et un rapport. Pour ajouter une vérification d'entraînement GCN et GAT :
+Pour inclure les tests de fumée GCN et GAT :
 
-    pip install -e ".[ml]"
     python scripts/run_demo.py --output-dir data/demo --with-gnn --epochs 3
 
-Les sorties sont séparées des captures réelles dans data/demo/. Le dépôt ignore ces artefacts générés. Les métriques synthétiques ne doivent pas être utilisées pour soutenir les hypothèses du mémoire.
+Ces données sont synthétiques. Elles vérifient le fonctionnement du pipeline et ne démontrent pas une performance de détection APT.
 
-## 3. Démarrer le laboratoire
+## 5. Démarrer le laboratoire SDN
 
-Terminal 1 — contrôleur et collecte :
+Terminal 1 — contrôleur Ryu :
 
     ryu-manager --ofp-tcp-listen-port 6653 sdn/ryu_app.py
 
 Terminal 2 — topologie :
 
     sudo -E .venv/bin/python simulation/topology.py
-
-La topologie contient cinq hôtes privés sur un commutateur Open vSwitch. Elle effectue un ping initial puis ouvre une CLI Mininet étendue.
 
 Dans la CLI Mininet :
 
@@ -56,94 +82,43 @@ Dans la CLI Mininet :
     scenario exfil
     exit
 
-Les scénarios ne déploient aucun exploit. La reconnaissance et le mouvement latéral sont des tentatives TCP bornées vers les IPs privées de la topologie. Le transfert dit « exfil » envoie uniquement des données factices de taille fixe vers un récepteur du laboratoire.
+Les scénarios sont confinés au réseau privé de laboratoire 10.0.0.0/24 et n'exécutent aucun exploit. Le scénario exfil transfère uniquement des données factices vers un récepteur du laboratoire.
 
-Chaque commande de scénario écrit une annotation dans data/raw/scenario_labels.csv. Le contrôleur écrit les statistiques OpenFlow dans data/raw/flow_stats.csv. Attendre au moins 10 secondes entre les commandes de scénario pour réduire le chevauchement des fenêtres d'annotation.
+## 6. Préparer les données
 
-Pour recommencer une expérience avec des captures vierges, arrêter Ryu et Mininet puis afficher d'abord les fichiers qui seraient supprimés :
-
-    python scripts/reset_lab_data.py
-
-La suppression n'a lieu qu'avec une confirmation explicite :
-
-    python scripts/reset_lab_data.py --yes
-
-Le script ne supprime ni les modèles entraînés ni les rapports.
-
-## 4. Construire le dataset de graphes
-
-Après avoir collecté des flux et lancé des scénarios normaux et suspects :
+Après la collecte de fenêtres annotées :
 
     gnn-sdn-apt prepare
     gnn-sdn-apt inspect
 
-Produits créés :
-- data/processed/flow_features.csv : deltas de compteurs et débits par flux ;
-- data/processed/graphs.jsonl : un graphe dirigé par fenêtre temporelle.
+Les observations sans annotation restent inconnues (label -1) et ne doivent pas être converties en trafic normal.
 
-Une observation sans annotation correspond au label -1, pas à une observation normale. Les annotations du laboratoire utilisent 0 pour normal et 1 pour suspect.
-
-## 5. Entraîner la baseline classique
+## 7. Entraîner et comparer
 
     gnn-sdn-apt train-baseline --calibrate-threshold
-    gnn-sdn-apt inspect
-
-Artefacts :
-- models/checkpoints/baseline.joblib ;
-- reports/baseline_metrics.json.
-
-La baseline Random Forest est la référence de comparaison. Le rapport indique si le découpage temporel a pu être utilisé. Quand il y a trop peu de fenêtres, un repli au niveau des observations est marqué explicitement ; il ne faut pas le présenter comme une évaluation temporelle indépendante.
-
-## 6. Entraîner un GCN ou un GAT
-
-Après la baseline, installer l'extra ML et collecter suffisamment de graphes annotés dans plusieurs fenêtres temporelles :
-
-    pip install -e ".[ml]"
     gnn-sdn-apt train-gnn --model gcn --epochs 100 --calibrate-threshold
     gnn-sdn-apt train-gnn --model gat --epochs 100 --calibrate-threshold
+    gnn-sdn-apt compare
 
-Artefacts : modèles .pt et rapports JSON correspondants dans models/checkpoints et reports.
+Les commandes GCN/GAT requièrent l'extra ML. L'entraînement doit utiliser des partitions chronologiques séparées lorsque le nombre de snapshots le permet. Le seuil doit être calibré sur validation, jamais sur le test final.
 
-L'entraînement GNN utilise un découpage chronologique par snapshots. Avec --calibrate-threshold et au moins six snapshots utilisables, les snapshots les plus anciens servent à l'entraînement, les suivants à la calibration du seuil et les plus récents au test final. Chaque partition doit contenir les deux classes. Si les données ne permettent pas un tel découpage, le code revient à un seuil fixe configuré et le rapport le signale.
-
-## 7. Inférence en quasi-temps réel
-
-Après entraînement du modèle choisi, lancer le service suivant dans un autre terminal :
+## 8. Inférence
 
     gnn-sdn-apt-live --model baseline --interval 5
 
-Le nom de commande exposé par le package peut être lancé de façon équivalente avec :
+Remplacer baseline par gcn ou gat uniquement après avoir entraîné le modèle correspondant. Les alertes et décisions sont écrites dans les chemins définis dans config/config.yaml.
 
-    gnn-sdn-apt-live --model baseline --interval 5
+## 9. Mitigation en laboratoire uniquement
 
-Utiliser --model gcn ou --model gat après entraînement de ces modèles. Les scores au-dessus du seuil sont ajoutés à data/processed/alerts.jsonl et data/processed/decisions.jsonl.
+La mitigation est désactivée par défaut. Elle requiert les deux conditions suivantes :
+- `mitigation.enabled: true` dans config/config.yaml ;
+- `GNN_SDN_MITIGATION=1` dans l'environnement du contrôleur Ryu et du service d'inférence.
 
-Le seuil de 0,90 est un paramètre de départ, pas un résultat validé. Il doit être sélectionné à partir des mesures sur le jeu de validation, avant l'évaluation finale.
+Démarrer Ryu et le service d'inférence avec cette variable uniquement pendant une expérience autorisée et isolée. Les règles sont temporaires et limitées à 10.0.0.0/24. Ne jamais activer le blocage sur un réseau de production.
 
-## 8. Mitigation contrôlée
+## 10. Tests
 
-La mitigation est désactivée par défaut. Pour l'activer, deux conditions sont requises :
-1. config/config.yaml doit contenir mitigation.enabled: true ;
-2. le contrôleur Ryu doit démarrer avec GNN_SDN_MITIGATION=1.
-
-Exemple uniquement dans le laboratoire, après avoir mis mitigation.enabled à true dans config/config.yaml. Démarrer d'abord Ryu :
-
-    GNN_SDN_MITIGATION=1 ryu-manager --ofp-tcp-listen-port 6653 sdn/ryu_app.py
-
-Puis lancer également le service d'inférence avec la même variable :
-
-    GNN_SDN_MITIGATION=1 gnn-sdn-apt-live --model baseline --interval 5
-
-Le contrôleur n'accepte les ordres de blocage que pour une adresse IPv4 dans 10.0.0.0/24. Les règles de blocage expirent après 60 secondes. Il faut conserver le mode alerte pendant le développement et ne tester le blocage qu'après analyse des faux positifs.
-
-Après une expérience de mitigation, résumer les horodatages décision-action enregistrés par Ryu :
-
-    gnn-sdn-apt summarize-mitigation
-
-## 9. Tests automatisés
-
-    pip install -e ".[dev]"
     python -m compileall -q src simulation sdn scripts
     pytest -q
 
-Le workflow GitHub Actions lance les tests unitaires à chaque push et pull request. Les tests Mininet/Ryu de bout en bout nécessitent une VM Linux configurée et doivent être validés dans cet environnement.
+Les tests unitaires ne remplacent pas l'intégration Mininet/Ryu dans la VM Linux.
