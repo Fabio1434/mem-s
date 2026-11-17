@@ -74,7 +74,7 @@ def test_model_scores_create_persistent_incidents_and_preserve_status(tmp_path):
     database = tmp_path / "siem.db"
     scores = [{"source_ip": "10.0.0.7", "score": 0.96, "timestamp": 1700000000}]
     assert persist_model_findings(
-        database, scores, model_name="gcn", threshold=0.9, window_seconds=10
+        database, scores, model_name="gcn", threshold=0.85, window_seconds=10
     ) == 1
 
     store = SQLiteSiemStore(database)
