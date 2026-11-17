@@ -95,8 +95,7 @@ def test_incremental_ingestion_detects_same_size_rewrite(tmp_path):
 
     rows = [_row(0), _row(1)]
     rows[1]["ip_dst"] = "10.0.9.9"
-    _write(raw, 0)
-    with raw.open("a", newline="", encoding="utf-8") as handle:
+    with raw.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS)
         writer.writeheader()
         writer.writerows(rows)
