@@ -48,7 +48,7 @@ def _timestamps(series: pd.Series) -> pd.Series:
     if numeric.notna().mean() >= 0.95:
         return numeric
     parsed = pd.to_datetime(series, errors="coerce", utc=True, format="mixed")
-    return parsed.astype("int64", copy=False).where(parsed.notna(), np.nan) / 1e9
+    return parsed.astype("int64").where(parsed.notna(), np.nan) / 1e9
 
 
 def _labels(series: pd.Series | None, count: int) -> tuple[list[int], list[str]]:
