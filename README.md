@@ -1,30 +1,42 @@
-# GNN-SDN-APT Detection
+# SIEM léger GNN-SDN pour l'étude des comportements APT
 
 ## Sujet du mémoire
 
-**Détection et mitigation automatisées des comportements APT par Graph Neural Networks dans un environnement SDN.**
+**Conception d'un SIEM intelligent et spécialisé basé sur les Graph Neural Networks et le Software-Defined Networking pour la détection et la mitigation automatisées des comportements caractéristiques des attaques APT.**
 
-Prototype de recherche M2 : collecte de statistiques OpenFlow, transformation en graphes temporels, comparaison d'une baseline classique avec GCN/GAT, puis génération d'alertes et réponse SDN contrôlée dans un laboratoire Mininet.
+Prototype de recherche M2 limité à la télémétrie réseau d'un laboratoire SDN. Il étudie la collecte et la centralisation d'événements OpenFlow, leur corrélation temporelle, la représentation des communications en graphes, la comparaison Random Forest/GCN/GAT et une réponse SDN contrôlée.
 
-## Architecture
+Le projet ne vise pas à remplacer un SIEM d'entreprise multi-sources. Les journaux systèmes et applicatifs sont hors périmètre initial.
 
-Mininet / hôtes privés → Open vSwitch / OpenFlow 1.3 → Ryu → flow_stats.csv → ingénierie des caractéristiques → graphes temporels NetworkX → Random Forest / GCN / GAT → score de menace → journal d'alerte → règle SDN temporaire optionnelle.
+## Architecture cible
+
+Mininet / hôtes privés → Open vSwitch / OpenFlow 1.3 → Ryu → collecte des statistiques → normalisation et centralisation légère → corrélation par fenêtres → graphes NetworkX → Random Forest / GCN / GAT → score de menace → alertes et incidents → décision → Ryu / OpenFlow → journal d'audit.
+
+Le stockage commence avec des fichiers CSV/JSONL et doit évoluer vers SQLite pour l'indexation des événements et le cycle de vie des incidents. La conception fonctionnelle est décrite dans `docs/11_siem_lightweight_design.md`.
 
 ## État du dépôt
 
-Le squelette de conception et le pipeline principal sont implémentés. Les tests unitaires et le workflow CI sont présents. La validation d'intégration réelle Mininet/Ryu reste à faire dans une VM Linux compatible ; aucune mesure expérimentale n'est revendiquée avant cette validation.
+Le dépôt contient déjà la topologie Mininet, le contrôleur Ryu, les scénarios de laboratoire, le pipeline de caractéristiques et graphes, la baseline Random Forest, les modèles GCN/GAT, l'inférence, les alertes JSONL et un mécanisme de blocage temporaire protégé.
 
-## Installation Python
+Les fonctions SIEM supplémentaires — schéma canonique unifié, corrélation explicite, base d'incidents et tableau de bord — sont des évolutions à implémenter. La validation d'intégration Mininet/Ryu et les mesures expérimentales réelles restent à effectuer. Aucune performance de détection APT n'est revendiquée à ce stade.
 
-Sous Linux/VM Linux, avec Mininet, Open vSwitch et Ryu installés :
+## Installation
+
+Le laboratoire nécessite une VM Linux avec Mininet, Open vSwitch et Ryu installés selon les versions compatibles avec la distribution. Ne pas remplacer le Python système de Kali et ne pas utiliser `sudo pip`.
+
+Depuis la racine du dépôt :
 
     python3 -m venv --system-site-packages .venv
     source .venv/bin/activate
+    python -m pip install --upgrade pip
     pip install -e ".[dev]"
+    python scripts/check_environment.py
 
 Pour les modèles GNN :
 
     pip install -e ".[ml]"
+
+Si la version Python par défaut de la distribution est trop récente pour une dépendance SDN/ML, créer un environnement avec une version Python prise en charge plutôt que de modifier le Python système.
 
 ## Démarrer le laboratoire
 
@@ -44,60 +56,22 @@ Dans la CLI Mininet :
     scenario lateral
     scenario exfil
 
-Ces scénarios restent confinés aux hôtes privés 10.0.0.0/24. Les tentatives TCP sont bornées et n'exécutent pas d'exploits. Le transfert de données utilise des octets factices vers un récepteur dans la topologie.
+Les scénarios restent confinés aux hôtes privés 10.0.0.0/24. Ils n'exécutent pas d'exploits. Le transfert de données utilise des octets factices vers un récepteur du laboratoire.
 
-## Smoke test hors Mininet
-
-Pour vérifier tout le pipeline sans attendre d'avoir accès à une VM SDN, le dépôt fournit un captureur synthétique marqué comme tel :
+## Smoke test logiciel sans Mininet
 
     python scripts/run_demo.py --output-dir data/demo
 
-Cette commande génère une capture fictive et ses annotations, prépare les features et les graphes temporels, entraîne la baseline Random Forest et écrit les rapports dans data/demo/reports/. Pour inclure aussi GCN et GAT :
+Pour inclure GCN et GAT :
 
     pip install -e ".[ml]"
     python scripts/run_demo.py --output-dir data/demo --with-gnn --epochs 3
 
-**Important :** les métriques de ce smoke test servent uniquement à vérifier le fonctionnement du logiciel. Elles ne représentent pas la performance du détecteur sur de vraies attaques ou des APT. Pour l'évaluation du mémoire, utiliser des données collectées et annotées dans le labo ou un dataset public adapté.
+Les données de démonstration sont synthétiques. Les métriques servent à vérifier le fonctionnement du logiciel et ne démontrent pas les performances sur des attaques réelles ou des APT.
 
-## Comment l'IA intervient dans le pipeline
+## Entraînement et comparaison
 
-L'IA n'est pas un chatbot : ce sont des modèles de classification entraînés sur des exemples de trafic annotés. Une ligne de décision correspond à un hôte source dans une fenêtre temporelle.
-
-1. Ryu écrit les statistiques OpenFlow dans le fichier de flux.
-2. Le pipeline calcule les caractéristiques et construit un graphe par fenêtre : les hôtes sont les nœuds, les communications sont les arêtes.
-3. Le modèle attribue à chaque hôte source un score entre 0 et 1. La Random Forest utilise les caractéristiques de l'hôte ; GCN et GAT exploitent aussi les relations entre hôtes.
-4. Le seuil configuré convertit le score en décision. Par défaut, le service génère seulement des alertes ; le blocage SDN est une option séparée et désactivée par défaut.
-
-### Essayer le cycle complet avec les données synthétiques
-
-La démonstration inclut les modèles GCN et GAT si l'extra ML est installé :
-
-    pip install -e ".[ml]"
-    python scripts/run_demo.py --output-dir data/demo --with-gnn --epochs 3
-
-Pour entraîner un modèle sur les données préparées du laboratoire, après avoir collecté et annoté suffisamment de fenêtres normales et suspectes :
-
-    gnn-sdn-apt prepare
-    gnn-sdn-apt train-gnn --model gcn --epochs 100 --calibrate-threshold
-
-L'inférence continue peut alors utiliser ce modèle :
-
-    gnn-sdn-apt-live --model gcn --interval 5
-
-Pour GAT, remplacer `gcn` par `gat`. Pour la baseline, entraîner avec `gnn-sdn-apt train-baseline --calibrate-threshold`, puis lancer `gnn-sdn-apt-live --model baseline --interval 5`.
-
-Le modèle chargé en direct doit avoir été entraîné sur le même schéma de caractéristiques. Les alertes et décisions sont écrites dans les chemins définis dans `config/config.yaml`. Le score est une estimation apprise à partir des données d'entraînement, pas une preuve qu'une APT est présente. Les performances ne sont pas validées tant que le pipeline n'a pas été évalué sur des captures annotées et séparées chronologiquement.
-
-## Importer un dataset public horodaté
-
-L'importeur générique convertit notamment des CSV de type CICFlowMeter/UNSW vers le schéma du projet. Les labels de catégorie d'attaque deviennent « normal vs attaque » et ne doivent pas être décrits comme des labels APT spécifiques.
-
-    gnn-sdn-apt import-csv --input /chemin/vers/dataset.csv --output data/raw/public_flows.csv
-    gnn-sdn-apt prepare --raw-input data/raw/public_flows.csv --labels data/raw/no_lab_annotations.csv
-
-## Entraîner et comparer les modèles
-
-Après la collecte de flux et l'annotation des scénarios :
+Après avoir collecté et annoté suffisamment de fenêtres du laboratoire :
 
     gnn-sdn-apt prepare
     gnn-sdn-apt inspect
@@ -106,33 +80,31 @@ Après la collecte de flux et l'annotation des scénarios :
     gnn-sdn-apt train-gnn --model gat --epochs 100 --calibrate-threshold
     gnn-sdn-apt compare
 
-Les commandes GCN/GAT requièrent l'extra ML. Il faut collecter suffisamment de fenêtres annotées comprenant les deux classes avant l'entraînement. Avec --calibrate-threshold et suffisamment de snapshots, un seuil est choisi sur une partition chronologique de validation séparée. Si ce découpage n'est pas viable, le seuil configuré est conservé et indiqué dans le rapport. Les métriques sont sauvegardées dans reports/.
+Le découpage doit être chronologique lorsque le nombre de snapshots le permet. Les événements sans annotation restent inconnus (-1), et ne sont pas utilisés comme exemples normaux.
 
-## Inférence et mitigation optionnelle
-
-Après avoir entraîné le modèle :
+## Inférence et mitigation
 
     gnn-sdn-apt-live --model baseline --interval 5
 
-Les alertes et décisions sont écrites dans data/processed/. En cas de blocage expérimental, les latences décision-action sont résumées par gnn-sdn-apt summarize-mitigation. La mitigation SDN est désactivée par défaut et requiert une activation explicite dans le YAML ainsi que GNN_SDN_MITIGATION=1 dans l'environnement du contrôleur. Les blocs n'acceptent que des sources du sous-réseau de laboratoire et expirent après 60 secondes. Ne pas l'activer sur un réseau de production.
+La mitigation reste désactivée par défaut. Elle exige une activation explicite dans le YAML et `GNN_SDN_MITIGATION=1` dans l'environnement des processus concernés. Le contrôleur limite le blocage au sous-réseau de laboratoire 10.0.0.0/24 et utilise des règles temporaires. Ne jamais activer ce mécanisme sur un réseau de production.
 
 ## Documentation
 
-- docs/01_conception.md — problématique et objectifs
-- docs/02_architecture.md — architecture technique
-- docs/03_methodologie.md — méthodologie
-- docs/04_dataset.md — données et graphes
-- docs/05_scenarios.md — scénarios
-- docs/06_roadmap.md — état d'avancement
-- docs/08_execution.md — procédure d'exécution complète
-- docs/09_evaluation_protocol.md — protocole expérimental
-- docs/10_data_dictionary.md — dictionnaire des données
+- `docs/01_conception.md` — problématique, objectifs et hypothèses
+- `docs/02_architecture.md` — architecture technique
+- `docs/03_methodologie.md` — méthodologie expérimentale
+- `docs/04_dataset.md` — données et graphes
+- `docs/05_scenarios.md` — scénarios
+- `docs/06_roadmap.md` — état d'avancement
+- `docs/08_execution.md` — procédure d'exécution
+- `docs/09_evaluation_protocol.md` — protocole d'évaluation
+- `docs/10_data_dictionary.md` — dictionnaire des données
+- `docs/11_siem_lightweight_design.md` — fonctions SIEM légères et critères d'acceptation
 
-## Vérifications et tests
+## Vérifications
 
     python scripts/check_environment.py
     python -m compileall -q src simulation sdn scripts
     pytest -q
 
-GitHub Actions lance également les tests unitaires à chaque push et pull request. Les tests de bout en bout nécessitent Mininet, Open vSwitch et Ryu sur une VM Linux ; ils ne peuvent pas être certifiés par les tests Python unitaires seuls.
-
+Les tests unitaires ne remplacent pas les tests d'intégration Mininet/Ryu. Les résultats expérimentaux ne doivent être présentés qu'après collecte et évaluation de données annotées réelles du laboratoire.
