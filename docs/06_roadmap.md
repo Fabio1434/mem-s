@@ -1,58 +1,65 @@
 # 06 — Roadmap du projet
 
-## Phase 1 — Conception
-- [x] Initialiser le dépôt
-- [x] Définir la problématique, les objectifs et les hypothèses
-- [x] Définir l'architecture et le périmètre
+## Phase 1 — Conception scientifique
+- [x] Définir la problématique, le sujet et les hypothèses GNN/SDN
+- [x] Définir le périmètre d'un SIEM léger spécialisé dans la télémétrie réseau
+- [x] Définir l'architecture cible et les limites du prototype
 - [x] Définir la méthodologie et les métriques
-- [ ] Valider les choix avec l'encadrement
+- [ ] Faire valider le périmètre et les hypothèses par l'encadreur
 
-## Phase 2 — Laboratoire SDN
-- [x] Définir la topologie Mininet à cinq hôtes
-- [x] Préparer OpenFlow 1.3 et le contrôleur Ryu
-- [x] Apprentissage de forwarding et collecte des statistiques
-- [x] Préparer des scénarios normaux/suspects bornés et annotés
-- [ ] Installer les dépendances et valider le laboratoire en VM Linux
+## Phase 2 — Environnement expérimental
+- [x] Définir la topologie Mininet et les scénarios contrôlés
+- [x] Préparer le contrôleur Ryu/OpenFlow 1.3 dans le dépôt
+- [ ] Installer Mininet et Open vSwitch dans la VM Kali/Linux
+- [ ] Vérifier la connectivité Mininet et la connexion au contrôleur Ryu
+- [ ] Exécuter les scénarios et vérifier la collecte des statistiques
 
-## Phase 3 — Pipeline de données
-- [x] Définir les schémas des flux, annotations et graphes
-- [x] Calculer deltas de compteurs et débits
-- [x] Distinguer les compteurs OpenFlow cumulatifs des lignes de flux indépendantes importées
-- [x] Construire des snapshots de graphes temporels NetworkX
-- [x] Sérialiser les graphes en JSONL
-- [x] Ajouter des tests unitaires et une capture synthétique reproductible
-- [x] Ajouter une première normalisation canonique indépendante du contrôleur\n- [x] Ajouter le stockage append-only JSONL et SQLite des événements/incidents\n- [x] Ajouter une corrélation explicable de fan-out par hôte et fenêtre temporelle\n- [ ] Connecter le collecteur Ryu au stockage SIEM canonique\n- [ ] Valider le volume et la qualité des données réelles du laboratoire
+## Phase 3 — Pipeline SIEM léger
+- [x] Collecter les statistiques OpenFlow en CSV
+- [x] Produire des annotations de scénarios
+- [x] Produire des alertes, décisions et journaux de mitigation en JSONL
+- [x] Définir la cible fonctionnelle de normalisation et centralisation dans docs/11
+- [ ] Implémenter un schéma canonique d'événement avec provenance et identifiant
+- [ ] Centraliser les événements normalisés en JSONL append-only
+- [ ] Ajouter des règles de corrélation explicables par hôte/fenêtre
+- [ ] Ajouter SQLite pour l'indexation et le cycle de vie des incidents
+- [ ] Ajouter des tests unitaires et d'intégration du pipeline SIEM
 
-## Phase 4 — Modèles IA
-- [x] Random Forest comme baseline
-- [x] Architecture GCN
-- [x] Architecture GAT
-- [x] Entraînement avec séparation chronologique par snapshots pour GNN
-- [x] Rapports de métriques reproductibles
-- [ ] Collecter un dataset annoté suffisant et produire les résultats expérimentaux
+## Phase 4 — Modélisation GNN
+- [x] Préparer les caractéristiques des hôtes et des flux
+- [x] Construire des snapshots NetworkX
+- [x] Implémenter Random Forest comme baseline
+- [x] Implémenter les modèles GCN et GAT
+- [ ] Collecter suffisamment de fenêtres annotées réelles dans le laboratoire
+- [ ] Entraîner et calibrer les modèles sur les données du laboratoire
+- [ ] Comparer les modèles sur les mêmes partitions chronologiques
 
-## Phase 5 — Détection intégrée
-- [x] Inférence périodique sur le snapshot le plus récent
-- [x] Score de menace et seuil configurable
-- [x] Journaux d'alertes et de décisions
-- [x] Cooldown des alertes par hôte
-- [x] Ajouter les tests unitaires du module SIEM (normalisation, JSONL, SQLite, corrélation)\n- [ ] Connecter les findings SIEM au moteur de score GNN et à la gestion complète des incidents\n- [ ] Calibrer le seuil avec un jeu de validation réel dédié
+## Phase 5 — Détection et incidents
+- [x] Inférence périodique et score de menace
+- [x] Alertes et décisions JSONL
+- [ ] Ajouter une déduplication stable des alertes et un niveau de gravité
+- [ ] Relier les alertes à des incidents persistants
+- [ ] Ajouter les transitions open / investigating / contained / closed
+- [ ] Évaluer la qualité de détection et les faux positifs
 
 ## Phase 6 — Mitigation SDN
-- [x] Liaison des décisions au contrôleur Ryu
-- [x] Blocage IPv4 temporaire en laboratoire, explicitement désactivé par défaut
-- [x] Garde-fou en défense en profondeur sur le sous-réseau 10.0.0.0/24 et expiration après 60 s
-- [ ] Mesurer le délai de décision-action et l'impact sur le trafic légitime
-- [ ] Évaluer les faux positifs avant toute activation contrôlée
+- [x] Préparer un blocage IPv4 temporaire dans Ryu
+- [x] Garde-fou sur le sous-réseau 10.0.0.0/24 et double activation
+- [x] Mitigation désactivée par défaut
+- [ ] Valider le chemin complet décision → Ryu → règle OpenFlow dans Mininet
+- [ ] Mesurer le délai décision-action et le délai de confinement
+- [ ] Mesurer l'impact sur le trafic légitime et les faux blocages
 
-## Phase 7 — Validation scientifique
-- [x] Protocole d'évaluation documenté
-- [x] Dictionnaire des données et limitations documentés
-- [x] Tests du pipeline complet sur une capture synthétique pour la baseline
-- [x] Tests de fumée GCN et GAT et workflow CI qui installe l'extra ML
-- [ ] Confirmer que le workflow GitHub Actions a terminé avec succès
-- [ ] Valider l'intégration Mininet/Ryu sur VM Linux
-- [ ] Comparer les modèles sur les mêmes données réelles et partitions
-- [ ] Analyser les limites et documenter la reproductibilité
+## Phase 7 — Supervision
+- [ ] Développer un tableau de bord Flask en lecture seule
+- [ ] Afficher événements, alertes, incidents et scores par hôte
+- [ ] Afficher l'historique et les latences de mitigation
 
-**Important :** les tests synthétiques valident le fonctionnement du logiciel, pas la performance du modèle sur des attaques réelles. Un module marqué comme implémenté n'est pas considéré comme expérimentalement validé tant que ses tests et mesures réelles ne sont pas réalisés.
+## Phase 8 — Évaluation scientifique et rédaction
+- [x] Définir le protocole d'évaluation et le dictionnaire des données
+- [ ] Figer les captures, annotations, versions et configurations expérimentales
+- [ ] Produire les métriques Random Forest, GCN et GAT
+- [ ] Produire les mesures de mitigation
+- [ ] Analyser les limites, menaces à la validité et pistes futures
+
+**Règle de suivi :** une fonctionnalité présente dans le code n'est considérée comme validée qu'après son test dans l'environnement prévu. Les données synthétiques valident le fonctionnement logiciel, pas la performance sur des attaques APT.
