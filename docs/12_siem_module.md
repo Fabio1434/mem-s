@@ -1,19 +1,37 @@
-# SIEM léger — premier module opérationnel
+# SIEM léger — ingestion et corrélation opérationnelles
 
-Le module `gnn_sdn_apt.siem` fournit une première couche indépendante de Mininet/Ryu :
+Les modules `gnn_sdn_apt.siem` et `gnn_sdn_apt.siem_ingest` fournissent une couche SIEM légère intégrée au service d'inférence live.
 
-- normalisation vers un événement canonique avec horodatage UTC, provenance et label inconnu par défaut (`-1`) ;
-- stockage append-only JSONL ;
-- stockage SQLite des événements et du cycle de vie des incidents ;
-- corrélation explicable d'un comportement de fan-out/reconnaissance par source et fenêtre temporelle.
+## Fonctions
 
-## Utilisation rapide
+- Normalisation vers un événement canonique avec horodatage UTC, provenance et label inconnu par défaut (`-1`).
+- Stockage JSONL append-only disponible pour les usages d'audit hors ingestion live.
+- Stockage SQLite des événements et du cycle de vie des incidents.
+- Import des statistiques du collecteur Ryu depuis `data/raw/flow_stats.csv`.
+- Identifiants stables afin de rendre les cycles de polling idempotents.
+- Corrélation explicable du fan-out par hôte et fenêtre temporelle.
+- Conservation du statut d'un incident existant lors d'une nouvelle ingestion.
+
+## Intégration au service live
+
+Le service `gnn-sdn-apt-live` exécute l'ingestion SIEM avant le scoring GNN/baseline. La configuration est définie dans `config/config.yaml` :
+
+```yaml
+paths:
+  siem_db: data/siem/siem.db
+
+siem:
+  enabled: true
+  correlation_window_seconds: 60
+  min_distinct_destinations: 5
+```
+
+L'ingestion est passive : elle ne modifie pas les règles OpenFlow et n'active pas la mitigation. La base SQLite est créée automatiquement.
+
+## Utilisation autonome
 
 ```python
 from gnn_sdn_apt.siem import JsonlEventStore, SQLiteSiemStore, correlate_events
-
-jsonl = JsonlEventStore("data/siem/events.jsonl")
-sqlite = SQLiteSiemStore("data/siem/siem.db")
 
 event = {
     "timestamp": 1700000000,
@@ -22,12 +40,13 @@ event = {
     "ip_proto": 6,
     "byte_count": 1200,
 }
-jsonl.append(event)
-stored = sqlite.add_event(event)
+JsonlEventStore("data/siem/events.jsonl").append(event)
+store = SQLiteSiemStore("data/siem/siem.db")
+stored = store.add_event(event)
 findings = correlate_events([stored], window_seconds=60, min_distinct_destinations=5)
 ```
 
-La règle de fan-out ne s'active que si le nombre de destinations distinctes dépasse le seuil. Elle constitue un indicateur de reconnaissance réseau, pas une preuve d'APT. Les événements sans annotation gardent le label `-1` ; ils ne sont pas convertis en trafic normal.
+La règle fan-out constitue un indicateur de reconnaissance réseau, pas une preuve d'APT. Les événements sans annotation gardent le label `-1` ; ils ne sont pas convertis en trafic normal. La corrélation live travaille sur la fenêtre temporelle la plus récente du CSV. Les anciennes observations sont conservées dans SQLite, mais ne sont pas réalertées à chaque cycle.
 
 ## Tests
 
@@ -36,4 +55,4 @@ python -m pip install -e ".[dev]"
 pytest -q
 ```
 
-Ce module ne déclenche aucune action SDN. L'intégration au collecteur Ryu, au moteur de détection GNN et à une interface de visualisation reste une étape distincte à valider.
+Les tests d'ingestion utilisent un CSV Ryu synthétique. Ils ne remplacent pas un test de bout en bout avec Mininet, Open vSwitch et Ryu réellement exécutés.
