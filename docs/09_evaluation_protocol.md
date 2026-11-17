@@ -2,53 +2,71 @@
 
 ## Question expérimentale
 
-La représentation relationnelle d'un réseau sous forme de graphes temporels améliore-t-elle la détection de comportements suspects par rapport à un modèle classique utilisant les caractéristiques agrégées des hôtes ?
+La représentation relationnelle des communications réseau sous forme de graphes apporte-t-elle une amélioration mesurable par rapport à une baseline classique, et l'intégration SDN permet-elle une réponse de confinement mesurable dans le laboratoire ?
 
-## Hypothèses à mesurer
+## Hypothèses à tester
 
-- H1 : le GCN/GAT atteint un F1 supérieur ou un taux de faux positifs inférieur au modèle Random Forest, sur un protocole de séparation comparable.
-- H2 : une décision issue de l'inférence peut être transmise au contrôleur et appliquée dans la topologie de recherche dans un délai mesurable.
+- H1 : GCN ou GAT apporte une amélioration de F1 et/ou une réduction des faux positifs par rapport à Random Forest.
+- H2 : le contrôleur SDN applique une décision de confinement dans un délai mesurable.
+- H3 : la corrélation des événements par hôte et fenêtre permet de contextualiser des séquences de scénarios.
 
-Ces hypothèses doivent être confirmées par les résultats ; aucune supériorité d'un GNN n'est présupposée.
+Ces hypothèses ne sont pas considérées comme vraies avant l'expérimentation.
 
-## Protocole
+## Protocole de collecte
 
-1. Réinitialiser le laboratoire et vérifier l'heure système.
-2. Capturer plusieurs répétitions de trafic normal.
-3. Capturer les scénarios recon, lateral et exfil, chacun avec annotation.
-4. Vérifier l'équilibre des labels, les fenêtres temporelles et les observations non annotées.
-5. Construire le dataset et figer une version des données utilisée pour l'expérience.
-6. Entraîner Random Forest comme baseline.
-7. Entraîner GCN puis GAT avec un découpage chronologique par snapshots.
-8. Si le nombre et la distribution des snapshots le permettent, sélectionner le seuil sur une partition chronologique de validation avec --calibrate-threshold ; ne pas choisir le seuil en regardant le test final. Vérifier threshold_selection dans le rapport.
-9. Comparer les métriques sur le même périmètre d'évaluation.
-10. Répéter les scénarios et enregistrer les délais de détection et de réponse SDN.
+1. Réinitialiser le laboratoire et vérifier les horloges.
+2. Exécuter plusieurs répétitions de trafic normal.
+3. Exécuter séparément recon, lateral et exfil, avec des périodes normales entre les scénarios.
+4. Conserver les statistiques brutes OpenFlow et les annotations des scénarios.
+5. Vérifier les labels, les fenêtres et les événements inconnus.
+6. Enregistrer les versions du code, des dépendances, la configuration et la topologie.
+7. Geler un jeu de données avant entraînement et évaluation.
 
-## Métriques
+## Protocole de comparaison
 
-Détection :
-- précision, rappel et F1 ;
+- Random Forest est la baseline.
+- GCN et GAT utilisent le même périmètre de données et le même schéma de caractéristiques.
+- Utiliser une séparation chronologique par snapshots lorsque le volume le permet.
+- Réserver les données de test final jusqu'à la fin du choix des modèles et des seuils.
+- Calibrer le seuil sur une partition de validation indépendante ; ne jamais sélectionner le seuil en fonction des résultats du test.
+- Répéter les entraînements avec des graines documentées lorsque cela est pertinent.
+
+## Métriques de détection
+
+- précision, rappel, F1-score ;
 - taux de faux positifs (FPR) et taux de faux négatifs (FNR) ;
 - matrice de confusion ;
-- latence d'inférence et délai entre l'activité suspecte et l'alerte.
+- latence d'inférence ;
+- délai entre le début du comportement annoté et la première alerte.
 
-Mitigation :
-- délai décision-action et délai de confinement ;
+## Métriques SIEM et corrélation
+
+- nombre d'événements reçus, normalisés et rejetés ;
+- taux d'événements avec horodatage et provenance valides ;
+- délai d'ingestion ;
+- nombre d'alertes corrélées en incidents ;
+- délai de création et de mise à jour d'un incident.
+
+## Métriques de mitigation
+
+- délai entre création de décision et application de règle ;
+- délai de confinement observé ;
 - proportion de flux suspects bloqués ;
 - impact sur les communications légitimes ;
-- faux blocages et durée effective des règles.
+- nombre de faux blocages ;
+- durée réelle des règles temporaires.
 
 ## Reproductibilité
 
-Enregistrer la version du code, la configuration, la version de Python et des bibliothèques, la topologie, les commandes des scénarios, la graine aléatoire et les rapports. Conserver les labels séparés des caractéristiques pour éviter une fuite de données.
+Conserver la version du dépôt, la configuration, la version Python et les bibliothèques, les commandes de scénario, la graine aléatoire, les annotations et les rapports. Garder les données brutes séparées des données transformées.
 
-Le label de nœud est attribué au nœud source d'une communication annotée. Les observations sans vérité terrain restent en label -1 et ne sont pas incluses dans l'entraînement supervisé. Les annotations de scénario sont des étiquettes expérimentales et ne représentent pas une vérité terrain exhaustive sur un réseau réel.
+Les labels 0/1 ne sont appliqués qu'aux événements annotés. Les observations non annotées restent à -1 et ne sont pas traitées comme normales par défaut. Les scénarios du laboratoire sont des approximations expérimentales de comportements réseau ; ils ne constituent pas une vérité terrain exhaustive d'une campagne APT réelle.
 
-## Limites à discuter dans le mémoire
+## Limites à discuter
 
-- topologie très petite et synthétique ;
-- signatures de scénarios limitées et dépendantes de l'annotation ;
-- fenêtres de statistiques OpenFlow, et non capture paquet complète ;
-- classes potentiellement déséquilibrées ;
-- résultats de labo non généralisables directement à des réseaux de production ;
-- coût mémoire, latence et robustesse des modèles à mesurer avant toute affirmation de déploiement.
+- topologie virtualisée de petite taille ;
+- nombre limité de scénarios et de répétitions ;
+- visibilité basée sur les statistiques de flux OpenFlow, pas sur une inspection exhaustive des paquets ;
+- déséquilibre potentiel des classes ;
+- dépendance des résultats aux annotations et aux fenêtres temporelles ;
+- absence de garantie de généralisation aux réseaux de production.
