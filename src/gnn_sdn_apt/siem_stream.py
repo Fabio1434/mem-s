@@ -21,9 +21,15 @@ def _cursor_connect(database_path: str | Path) -> sqlite3.Connection:
             file_signature TEXT NOT NULL,
             header_hash TEXT NOT NULL,
             byte_offset INTEGER NOT NULL,
-            next_line INTEGER NOT NULL
+            next_line INTEGER NOT NULL,
+            checkpoint_hash TEXT NOT NULL DEFAULT ''
         )
     """)
+    columns = {row[1] for row in db.execute("PRAGMA table_info(ryu_ingest_cursor)")}
+    if "checkpoint_hash" not in columns:
+        db.execute(
+            "ALTER TABLE ryu_ingest_cursor ADD COLUMN checkpoint_hash TEXT NOT NULL DEFAULT ''"
+        )
     return db
 
 
@@ -65,16 +71,23 @@ def ingest_ryu_csv_incremental(
         handle.seek(0)
         with _cursor_connect(database_path) as db:
             saved = db.execute(
-                "SELECT file_signature, header_hash, byte_offset, next_line "
+                "SELECT file_signature, header_hash, byte_offset, next_line, checkpoint_hash "
                 "FROM ryu_ingest_cursor WHERE source_path=?",
                 (source_key,),
             ).fetchone()
 
+        checkpoint_matches = True
+        if saved is not None and int(saved[2]) > 0 and saved[4]:
+            saved_offset = int(saved[2])
+            handle.seek(max(0, saved_offset - 256))
+            checkpoint = handle.read(saved_offset - max(0, saved_offset - 256))
+            checkpoint_matches = hashlib.sha256(checkpoint).hexdigest() == saved[4]
         reset = (
             saved is None
             or saved[0] != signature
             or saved[1] != header_hash
             or stat.st_size < int(saved[2])
+            or not checkpoint_matches
         )
         if reset:
             offset, next_line = 0, 2
@@ -135,17 +148,23 @@ def ingest_ryu_csv_incremental(
 
     # Commit the cursor only after all complete rows have been persisted.
     # A crash before this point replays rows safely through stable event IDs.
+    with source.open("rb") as handle:
+        checkpoint_start = max(0, new_offset - 256)
+        handle.seek(checkpoint_start)
+        checkpoint = handle.read(new_offset - checkpoint_start)
+    checkpoint_hash = hashlib.sha256(checkpoint).hexdigest()
     with _cursor_connect(database_path) as db:
         db.execute(
             """INSERT INTO ryu_ingest_cursor
-            (source_path,file_signature,header_hash,byte_offset,next_line)
-            VALUES (?,?,?,?,?)
+            (source_path,file_signature,header_hash,byte_offset,next_line,checkpoint_hash)
+            VALUES (?,?,?,?,?,?)
             ON CONFLICT(source_path) DO UPDATE SET
               file_signature=excluded.file_signature,
               header_hash=excluded.header_hash,
               byte_offset=excluded.byte_offset,
-              next_line=excluded.next_line""",
-            (source_key, signature, header_hash, new_offset, current_line),
+              next_line=excluded.next_line,
+              checkpoint_hash=excluded.checkpoint_hash""",
+            (source_key, signature, header_hash, new_offset, current_line, checkpoint_hash),
         )
 
     all_recent = store.list_events(limit=10000)
