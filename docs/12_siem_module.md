@@ -27,7 +27,7 @@ siem:
   min_distinct_destinations: 5
 ```
 
-L'ingestion et la création des incidents sont passives : elles ne modifient pas les règles OpenFlow et n'activent pas la mitigation. Les scores ne constituent pas une preuve d'APT. La base SQLite est créée automatiquement.
+L'ingestion et la création des incidents sont passives : elles ne modifient pas les règles OpenFlow et n'activent pas la mitigation. Les scores ne constituent pas une preuve d'APT. La base SQLite est créée automatiquement. Le cycle de vie des incidents accepte les transitions contrôlées `open → investigating → contained → closed` (avec retour possible de `investigating` vers `open`) et journalise chaque changement. L'endpoint d'historique est en lecture seule.
 
 ## Tableau de bord local en lecture seule
 
@@ -37,7 +37,7 @@ Après avoir démarré la collecte et le service live, lancer :
 gnn-sdn-apt-dashboard --host 127.0.0.1 --port 8080
 ```
 
-Ouvrir `http://127.0.0.1:8080`. Le tableau affiche les incidents et les événements récents et expose deux endpoints GET (`/api/incidents`, `/api/events`). Il écoute sur localhost par défaut, n'offre aucune route de modification et ne pilote jamais les règles OpenFlow. Ne pas l'exposer sur une interface publique sans ajouter une authentification et une configuration de déploiement sécurisée.
+Ouvrir `http://127.0.0.1:8080`. Le tableau affiche les incidents et les événements récents et expose deux endpoints GET (`/api/incidents`, `/api/events`, `/api/incidents/<id>/history`). Il écoute sur localhost par défaut, n'offre aucune route de modification et ne pilote jamais les règles OpenFlow. Ne pas l'exposer sur une interface publique sans ajouter une authentification et une configuration de déploiement sécurisée.
 
 ## Utilisation autonome
 
