@@ -4,7 +4,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -43,7 +43,7 @@ def ingest_ryu_csv(
             event_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()
             event = store.add_event({
                 "event_id": event_id,
-                "timestamp": row["timestamp"],
+                "timestamp": float(row["timestamp"]),
                 "source_component": "ryu_openflow",
                 "event_type": "flow_stats",
                 "src_ip": row["ip_src"],
