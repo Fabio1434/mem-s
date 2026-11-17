@@ -18,10 +18,16 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "alerts": "data/processed/alerts.jsonl",
         "decisions": "data/processed/decisions.jsonl",
         "mitigation_events": "data/processed/mitigation_events.jsonl",
+        "siem_db": "data/siem/siem.db",
     },
     "graph": {"directed": True, "temporal_window_seconds": 10},
     "detection": {"model": "baseline", "threshold": 0.9, "use_model_threshold": True},
     "mitigation": {"enabled": False, "default_action": "alert"},
+    "siem": {
+        "enabled": True,
+        "correlation_window_seconds": 60,
+        "min_distinct_destinations": 5,
+    },
     "sdn": {"controller": "ryu", "openflow_version": "1.3"},
     "logging": {"level": "INFO"},
 }
