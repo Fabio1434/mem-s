@@ -40,7 +40,8 @@
 - [x] Alertes et décisions JSONL
 - [x] Ajouter des identifiants stables d'incident et des niveaux de gravité
 - [x] Relier les scores baseline/GCN/GAT au stockage des incidents persistants
-- [ ] Ajouter une API contrôlée pour les transitions open / investigating / contained / closed
+- [x] Ajouter une machine à états SQLite pour open / investigating / contained / closed avec journal append-only
+- [ ] Ajouter une API authentifiée pour modifier le statut des incidents
 - [ ] Évaluer la qualité de détection et les faux positifs
 
 ## Phase 6 — Mitigation SDN
